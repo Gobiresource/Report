@@ -12,8 +12,8 @@
 </div></header>
 <main class="container">
   <section class="hero">
-    <h1>V2 Dashboard</h1>
-    <p>Module бүрийн мэдээллийг тус тусад нь харуулна. Executive Summary дээр яг аль KPI гарахыг дараа сонгоно.</p>
+    <h1>Dashboard</h1>
+    <p>Удирдлага огноо болон сараа сонгож module бүрийн тайланг харна. Summary KPI-г дараагийн шатанд тусад нь сонгоно.</p>
     <div class="toolbar">
       <div class="field"><label>Огноо</label><input id="dateInput" type="date"></div>
       <div class="field"><label>Сар</label><input id="monthInput" type="month"></div>
@@ -26,7 +26,7 @@
 
   <div class="split">
     <aside class="side panel">
-      <div class="section-title"><div><h2>Modules</h2><p>Тус бүр дээр нь ажиллана.</p></div></div>
+      <div class="section-title"><div><h2>Тайлангийн хэсгүүд</h2><p>Эхний шатанд тус бүр дээр нь ажиллана.</p></div></div>
       <button class="tab active" data-tab="production">Үйлдвэрлэл / Лаб</button>
       <button class="tab" data-tab="transport">Тээвэр</button>
       <button class="tab" data-tab="fuel">Түлш</button>
@@ -34,7 +34,6 @@
       <button class="tab" data-tab="camp">Кемп</button>
       <button class="tab" data-tab="safety">ХАБЭА</button>
       <button class="tab" data-tab="issues">Асуудал</button>
-      <button class="tab" data-tab="cost">Сарын өртөг</button>
     </aside>
     <section>
       <div id="production" class="module panel"></div>
@@ -44,7 +43,6 @@
       <div id="camp" class="module panel hidden"></div>
       <div id="safety" class="module panel hidden"></div>
       <div id="issues" class="module panel hidden"></div>
-      <div id="cost" class="module panel hidden"></div>
     </section>
   </div>
   <div class="footer">V2 MVP — Cloudflare Pages Functions + D1</div>
@@ -63,7 +61,7 @@ const sample = {
   safety:{medical_aid:0,hse_violation:0,day_temp_c:null,night_temp_c:null,humidity_pct:null,wind_speed_ms:null},
   issues:[],warnings:[]
 };
-let currentDaily = sample, currentMonthly = null;
+let currentDaily = sample;
 function statusBadge(v){ return v ? '<span class="pill ok">✅ ирсэн</span>' : '<span class="pill bad">❌ ирээгүй</span>'; }
 function renderStatus(d){
   const depts=[['camp','Кемп'],['transport','Тээвэр'],['fuel','Түлш'],['equipment','Техник'],['production','Үйлдвэрлэл'],['safety','ХАБЭА'],['issues','Асуудал']];
@@ -108,21 +106,13 @@ function renderEquipment(d){
 function renderCamp(d){const c=d.camp||{};$('#camp').innerHTML=`<div class="section-title"><div><h2>Кемп / хүн хүч</h2><p>Кемп менежер зөвхөн өөрийн хэсгээ бөглөнө.</p></div></div><div class="grid cards"><div class="card"><div class="label">Нийт хүн</div><div class="value">${showInt(c.total_people)}</div></div><div class="card"><div class="label">Монгол</div><div class="value">${showInt(c.mongolian_count)}</div></div><div class="card"><div class="label">Хятад</div><div class="value">${showInt(c.chinese_count)}</div></div><div class="card"><div class="label">Гаднаас хооллосон</div><div class="value">${showInt(c.outside_meal_count)}</div></div></div>`}
 function renderSafety(d){const s=d.safety||{};$('#safety').innerHTML=`<div class="section-title"><div><h2>ХАБЭА</h2><p>Эмнэлгийн тусламж, зөрчил, цаг агаар.</p></div></div><div class="grid cards"><div class="card"><div class="label">Эмнэлгийн тусламж</div><div class="value">${showInt(s.medical_aid)}</div></div><div class="card"><div class="label">ХАБ зөрчил</div><div class="value">${showInt(s.hse_violation)}</div></div><div class="card"><div class="label">Өдөр / шөнө</div><div class="value">${show(s.day_temp_c)} / ${show(s.night_temp_c)} ℃</div></div><div class="card"><div class="label">Чийг / салхи</div><div class="value">${show(s.humidity_pct)}% / ${show(s.wind_speed_ms)} м/с</div></div></div>`}
 function renderIssues(d){$('#issues').innerHTML=`<div class="section-title"><div><h2>Үйлдвэрийн асуудал</h2><p>Issue log.</p></div></div>`+table(['№','Асуудал','Ноцтой байдал','Төлөв','Арга хэмжээ'],(d.issues||[]).map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.issue_text)}</td><td>${esc(r.severity||'')}</td><td>${esc(r.status||'')}</td><td>${esc(r.action_taken||'')}</td></tr>`))}
-async function renderCost(){
-  const m=$('#monthInput').value || monthISO();
-  try{ currentMonthly=await api(`/api/monthly-summary?month=${m}`); }catch(e){ currentMonthly={month:m,historical:[],cost:{}}; }
-  const c=currentMonthly.cost||{}, hist=currentMonthly.historical||[];
-  $('#cost').innerHTML=`<div class="section-title"><div><h2>Сарын өртөг / Historical</h2><p>Өртгийн формулыг dashboard дотор тооцно.</p></div></div>
-  <div class="grid cards"><div class="card"><div class="label">Cost A</div><div class="value">${c.cost_a_mnt_ton?moneyFmt.format(c.cost_a_mnt_ton):'—'} ₮/тн</div><div class="sub">машины түлш</div></div><div class="card"><div class="label">Cost B</div><div class="value">${c.cost_b_mnt_ton?moneyFmt.format(c.cost_b_mnt_ton):'—'} ₮/тн</div><div class="sub">машин + үйлдвэр түлш</div></div><div class="card"><div class="label">Баяжуулсан нүүрс</div><div class="value">${show(c.clean_coal_ton)} тн</div></div><div class="card"><div class="label">Түлшний үнэ</div><div class="value">${moneyFmt.format(c.fuel_price_mnt_l||4250)} ₮/л</div></div></div>
-  <h3>Түүхэн сарын дата</h3>${table(['Сар','Баяжуулсан тн','Шлам тн','Хаягдал тн','Машины түлш л','Үйлдвэр түлш л','Cost A','Cost B'], hist.map(r=>`<tr><td>${r.month}</td><td>${show(r.clean_coal_ton)}</td><td>${show(r.shlam_ton)}</td><td>${show(r.waste_ton)}</td><td>${show(r.machine_fuel_liter)}</td><td>${show(r.generator_fuel_liter)}</td><td>${r.cost_a_mnt_ton?moneyFmt.format(r.cost_a_mnt_ton):'—'}</td><td>${r.cost_b_mnt_ton?moneyFmt.format(r.cost_b_mnt_ton):'—'}</td></tr>`))}`;
-}
-function renderAll(d){ currentDaily=d; renderStatus(d); renderProduction(d); renderTransport(d); renderFuel(d); renderEquipment(d); renderCamp(d); renderSafety(d); renderIssues(d); renderCost(); }
+function renderAll(d){ currentDaily=d; renderStatus(d); renderProduction(d); renderTransport(d); renderFuel(d); renderEquipment(d); renderCamp(d); renderSafety(d); renderIssues(d); }
 async function load(){
  const date=$('#dateInput').value || todayISO(); $('#dateInput').value=date; $('#monthInput').value = $('#monthInput').value || date.slice(0,7); setStatus($('#loadStatus'),'Ачаалж байна...');
  try{ const data=await api(`/api/daily-summary?date=${date}`); renderAll(data); setStatus($('#loadStatus'),'Амжилттай','ok'); }
  catch(e){ renderAll({...sample,date,month:date.slice(0,7),warnings:[`API/D1 холбогдоогүй тул demo дата харуулж байна: ${e.message}`]}); setStatus($('#loadStatus'),'Demo горим','warn'); }
 }
-$$('.side .tab').forEach(b=>b.onclick=()=>{$$('.side .tab').forEach(x=>x.classList.remove('active')); b.classList.add('active'); $$('.module').forEach(x=>x.classList.add('hidden')); $('#'+b.dataset.tab).classList.remove('hidden'); if(b.dataset.tab==='cost') renderCost();});
+$$('.side .tab').forEach(b=>b.onclick=()=>{$$('.side .tab').forEach(x=>x.classList.remove('active')); b.classList.add('active'); $$('.module').forEach(x=>x.classList.add('hidden')); $('#'+b.dataset.tab).classList.remove('hidden');});
 $('#loadBtn').onclick=load; $('#dateInput').value=todayISO(); $('#monthInput').value=monthISO(); load();
 </script>
 </body></html>

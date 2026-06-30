@@ -4,14 +4,24 @@
 <body>
 <header class="topbar"><div class="container topbar-inner"><a class="brand" href="index.html"><span class="brand-mark">GRD</span><span>Говь Ресурс Девелопмент ХХК</span></a><nav class="nav"><a href="index.html">Dashboard</a><a class="active" href="report.html">Тайлан илгээх</a><a href="admin.html">Админ</a><button id="themeToggle">Dark/Light</button></nav></div></header>
 <main class="container">
-<section class="hero"><h1>Тайлан илгээх</h1><p>Хэлтэс бүр өөрийн form-оо бөглөнө. Кемп менежер гараар нэгтгэхгүй.</p>
-<div class="toolbar">
-<div class="field"><label>Огноо</label><input type="date" id="dateInput"></div>
-<div class="field"><label>Тайлангийн төрөл</label><select id="department"><option value="production">Үйлдвэрлэл / Лаборатори</option><option value="transport">Тээвэр</option><option value="fuel">Түлш</option><option value="equipment">Техник</option><option value="camp">Кемп / хүн хүч</option><option value="safety">ХАБЭА</option><option value="issues">Үйлдвэрийн асуудал</option></select></div>
-<div class="field"><label>PIN</label><input type="password" id="pin" placeholder="PIN"></div>
-<button class="btn primary" id="submitBtn">Илгээх</button><span id="status" class="muted"></span>
-</div></section>
-<section id="formHost" class="panel"></section>
+<section class="hero"><h1>Тайлан илгээх</h1><p>Ажилтан эхлээд өөрийн хэсгийг сонгоно. Дараа нь PIN баталгаажсаны дараа тухайн form нээгдэнэ.</p></section>
+
+<section class="panel" id="loginPanel">
+  <div class="section-title"><div><h2>1. Хэсэг сонгох</h2><p>Өөрийн хариуцсан тайлангийн төрлийг сонгоод PIN оруулна.</p></div></div>
+  <div class="toolbar">
+    <div class="field"><label>Огноо</label><input type="date" id="dateInput"></div>
+    <div class="field"><label>Тайлангийн төрөл</label><select id="department"><option value="production">Үйлдвэрлэл / Лаборатори</option><option value="transport">Тээвэр</option><option value="fuel">Түлш</option><option value="equipment">Техник</option><option value="camp">Кемп / хүн хүч</option><option value="safety">ХАБЭА</option><option value="issues">Үйлдвэрийн асуудал</option></select></div>
+    <div class="field"><label>PIN</label><input type="password" id="pin" placeholder="PIN"></div>
+    <button class="btn primary" id="unlockBtn" type="button">Form нээх</button>
+    <span id="loginStatus" class="muted"></span>
+  </div>
+</section>
+
+<section id="formSection" class="panel hidden">
+  <div class="section-title"><div><h2 id="formTitle">2. Тайлан бөглөх</h2><p id="formSubtitle">PIN баталгаажсан.</p></div><button class="btn" type="button" id="changeDeptBtn">Хэсэг солих</button></div>
+  <div id="formHost"></div>
+  <div class="row-actions"><button class="btn primary" id="submitBtn" type="button">Илгээх</button><span id="status" class="muted"></span></div>
+</section>
 <div class="footer">PIN default: production 1111, transport 2222, fuel 3333, equipment 4444, camp 5555, safety 6666, issues 7777</div>
 </main>
 <script src="app.js"></script>
@@ -62,13 +72,43 @@ function payloadEquipment(){return {statuses:$$('.equipment-row').map(fd).filter
 function payloadCamp(){return fd($('#formHost'))}
 function payloadSafety(){return fd($('#formHost'))}
 function payloadIssues(){return {issues:$$('.issue-row').map(fd).filter(r=>String(r.issue_text||'').trim())}}
+const DEPT_LABELS={production:'Үйлдвэрлэл / Лаборатори',transport:'Тээвэр',fuel:'Түлш',equipment:'Техник',camp:'Кемп / хүн хүч',safety:'ХАБЭА',issues:'Үйлдвэрийн асуудал'};
+let unlockedDepartment=null;
 function render(){ const d=$('#department').value; ({production:renderProduction,transport:renderTransport,fuel:renderFuel,equipment:renderEquipment,camp:renderCamp,safety:renderSafety,issues:renderIssues}[d])(); }
+async function unlockForm(){
+ const department=$('#department').value, pin=$('#pin').value;
+ if(!$('#dateInput').value){ setStatus($('#loginStatus'),'Огноо сонгоно.','bad'); return; }
+ if(!pin){ setStatus($('#loginStatus'),'PIN оруулна.','bad'); return; }
+ setStatus($('#loginStatus'),'PIN шалгаж байна...');
+ try{
+   await api('/api/validate-pin',{method:'POST',body:JSON.stringify({department,pin})});
+   unlockedDepartment=department;
+   render();
+   $('#formTitle').textContent=`2. ${DEPT_LABELS[department]} тайлан бөглөх`;
+   $('#formSubtitle').textContent=`${$('#dateInput').value} өдрийн тайлан`;
+   $('#formSection').classList.remove('hidden');
+   setStatus($('#loginStatus'),'PIN зөв. Form нээгдлээ.','ok');
+   $('#formSection').scrollIntoView({behavior:'smooth',block:'start'});
+ }catch(e){
+   unlockedDepartment=null;
+   $('#formSection').classList.add('hidden');
+   setStatus($('#loginStatus'),`Алдаа: ${e.message}`,'bad');
+ }
+}
 async function submit(){
  const department=$('#department').value; const getters={production:payloadProduction,transport:payloadTransport,fuel:payloadFuel,equipment:payloadEquipment,camp:payloadCamp,safety:payloadSafety,issues:payloadIssues};
+ if(unlockedDepartment!==department){ setStatus($('#status'),'Хэсэг өөрчлөгдсөн байна. PIN дахин баталгаажуулна.','bad'); return; }
  const body={date:$('#dateInput').value, department, pin:$('#pin').value, payload:getters[department]()};
  setStatus($('#status'),'Илгээж байна...');
  try{ const res=await api('/api/submit',{method:'POST',body:JSON.stringify(body)}); setStatus($('#status'),`Амжилттай хадгаллаа. Submission #${res.submission_id}`,'ok'); }
  catch(e){ setStatus($('#status'),`Алдаа: ${e.message}`,'bad'); }
 }
-$('#department').onchange=render; $('#submitBtn').onclick=submit; render();
+function lockForm(){ unlockedDepartment=null; $('#formSection').classList.add('hidden'); setStatus($('#status'),''); }
+$('#department').onchange=()=>{ lockForm(); setStatus($('#loginStatus'),'Хэсэг сонгогдлоо. PIN оруулж form нээнэ.'); };
+$('#dateInput').onchange=lockForm;
+$('#pin').addEventListener('keydown',e=>{ if(e.key==='Enter') unlockForm(); });
+$('#unlockBtn').onclick=unlockForm;
+$('#changeDeptBtn').onclick=()=>{ lockForm(); $('#loginPanel').scrollIntoView({behavior:'smooth',block:'start'}); };
+$('#submitBtn').onclick=submit;
+setStatus($('#loginStatus'),'Хэсгээ сонгоод PIN оруулна.');
 </script></body></html>

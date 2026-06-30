@@ -9,6 +9,7 @@ export async function onRequest(context) {
     if (request.method === 'GET' && path === 'daily-summary') return dailySummary(env.DB, url.searchParams.get('date'));
     if (request.method === 'GET' && path === 'monthly-summary') return monthlySummary(env.DB, url.searchParams.get('month'));
     if (request.method === 'GET' && path === 'options') return options(env.DB);
+    if (request.method === 'POST' && path === 'validate-pin') return validatePin(env.DB, await request.json());
     if (request.method === 'POST' && path === 'submit') return submitReport(env.DB, await request.json());
     if (request.method === 'POST' && path === 'admin/monthly-actual') return saveMonthlyActual(env.DB, await request.json());
     return json({ ok:false, error:'API route олдсонгүй', path }, 404);
@@ -35,6 +36,14 @@ async function insertSubmission(db, date, department, payload) {
   const r = await db.prepare('INSERT INTO report_submissions(date,department,raw_json) VALUES(?,?,?)').bind(date, department, JSON.stringify(payload || {})).run();
   return r.meta?.last_row_id || null;
 }
+
+async function validatePin(db, body) {
+  const department = body.department;
+  if (!ALLOWED_DEPARTMENTS.has(department)) throw new Error('Тайлангийн төрөл буруу байна.');
+  const user = await checkPin(db, department, body.pin, false);
+  return json({ ok:true, department, user:{ name:user.name, department:user.department, role:user.role } });
+}
+
 async function submitReport(db, body) {
   const date = requireDate(body.date);
   const department = body.department;
