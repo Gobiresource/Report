@@ -1,0 +1,74 @@
+<!doctype html>
+<html lang="mn">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Тайлан илгээх — GRD V2</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header class="topbar"><div class="container topbar-inner"><a class="brand" href="index.html"><span class="brand-mark">GRD</span><span>Говь Ресурс Девелопмент ХХК</span></a><nav class="nav"><a href="index.html">Dashboard</a><a class="active" href="report.html">Тайлан илгээх</a><a href="admin.html">Админ</a><button id="themeToggle">Dark/Light</button></nav></div></header>
+<main class="container">
+<section class="hero"><h1>Тайлан илгээх</h1><p>Хэлтэс бүр өөрийн form-оо бөглөнө. Кемп менежер гараар нэгтгэхгүй.</p>
+<div class="toolbar">
+<div class="field"><label>Огноо</label><input type="date" id="dateInput"></div>
+<div class="field"><label>Тайлангийн төрөл</label><select id="department"><option value="production">Үйлдвэрлэл / Лаборатори</option><option value="transport">Тээвэр</option><option value="fuel">Түлш</option><option value="equipment">Техник</option><option value="camp">Кемп / хүн хүч</option><option value="safety">ХАБЭА</option><option value="issues">Үйлдвэрийн асуудал</option></select></div>
+<div class="field"><label>PIN</label><input type="password" id="pin" placeholder="PIN"></div>
+<button class="btn primary" id="submitBtn">Илгээх</button><span id="status" class="muted"></span>
+</div></section>
+<section id="formHost" class="panel"></section>
+<div class="footer">PIN default: production 1111, transport 2222, fuel 3333, equipment 4444, camp 5555, safety 6666, issues 7777</div>
+</main>
+<script src="app.js"></script>
+<script>
+initTheme(); $('#dateInput').value=todayISO();
+function opts(arr){ return arr.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join(''); }
+function num(name,label,step='0.01'){return `<div class="field"><label>${label}</label><input name="${name}" type="number" step="${step}"></div>`}
+function text(name,label){return `<div class="field"><label>${label}</label><input name="${name}" type="text"></div>`}
+function select(name,label,options){return `<div class="field"><label>${label}</label><select name="${name}">${options}</select></div>`}
+function rowDelete(){return `<button type="button" class="btn" onclick="this.closest('.form-card').remove()">Устгах</button>`}
+function renderProduction(){
+ $('#formHost').innerHTML=`<div class="section-title"><div><h2>Үйлдвэрлэл / Лаборатори</h2><p>Цахилгааны горимийн хуудас / 电表单 + 24小时生产化验单</p></div></div>
+ <div class="grid two"><div class="form-card"><h3>Өдрийн ээлж / 白班</h3><div class="form-grid" data-shift="day">${num('meter_value','Тоолуурын заалт / 电表','1')}${num('product_ton','Бүтээгдэхүүн / 精煤吨数')}${num('middling_ton','Мидлинг / 中煤')}${num('fuel_liter','Түлш / 柴油','1')}</div></div>
+ <div class="form-card"><h3>Шөнийн ээлж / 夜班</h3><div class="form-grid" data-shift="night">${num('meter_value','Тоолуурын заалт / 电表','1')}${num('product_ton','Бүтээгдэхүүн / 精煤吨数')}${num('middling_ton','Мидлинг / 中煤')}${num('fuel_liter','Түлш / 柴油','1')}</div></div></div>
+ <h3>Лаборатори / 化验单</h3><div id="labRows"></div><button class="btn" type="button" onclick="addLabRow()">+ Sample нэмэх</button>`;
+ ['8','10','12','14','16','18','20','22','24','2','4','6'].forEach(addLabRow);
+}
+function addLabRow(time=''){$('#labRows').insertAdjacentHTML('beforeend',`<div class="form-card lab-row"><div class="form-grid">${select('shift','Ээлж / 班次','<option value="day">Өдөр / 白班</option><option value="night">Шөнө / 夜班</option>')}<div class="field"><label>Цаг / 时间</label><input name="sample_time" value="${esc(time)}"></div>${num('luojing_ad','螺精Ad')}${num('fumei_ad','浮煤Ad')}${num('caking_g','粘结G')}</div><div class="row-actions">${rowDelete()}</div></div>`)}
+function renderTransport(){
+ $('#formHost').innerHTML=`<div class="section-title"><div><h2>Тээвэр</h2><p>Шлам, хаягдал, богино дотор рейс, бүтээгдэхүүн, пүүний мэдээлэл.</p></div></div>
+ <h3>Тээврийн үндсэн мэдээлэл</h3><div id="transportRows"></div><button class="btn" onclick="addTransportRow()" type="button">+ Тээврийн мөр</button>
+ <h3>Пүүний мэдээлэл</h3><div class="notice">Gross weight байхгүй бол net weight тооцохгүй. Хаалттай formula утга оруулахгүй.</div><div id="weighRows"></div><button class="btn" onclick="addWeighRow()" type="button">+ Пүүний мөр</button>`; addTransportRow(); addWeighRow();
+}
+function addTransportRow(){ $('#transportRows').insertAdjacentHTML('beforeend',`<div class="form-card transport-row"><div class="form-grid">${select('transport_type','Төрөл','<option value="shalaam">Шлам</option><option value="waste">Хаягдал</option><option value="short_waste">Богино дотор рейс</option><option value="product">Бүтээгдэхүүн</option>')}${select('truck_no','Машин',opts(TRUCKS))}${num('trips','Рейс','1')}${num('ton_weight','Тонн жин')}</div><div class="row-actions">${rowDelete()}</div></div>`)}
+function addWeighRow(){ $('#weighRows').insertAdjacentHTML('beforeend',`<div class="form-card weigh-row"><div class="form-grid">${select('truck_no','Машин',opts(['00-96 ММА','51-38 УКМ','08-49 УНН','08-46 УНН']))}${num('tare_weight_kg','Хоосон жин кг','1')}${num('gross_weight_kg','Ачаатай жин кг','1')}<div class="field"><label>Тайлбар</label><input name="note"></div></div><div class="row-actions">${rowDelete()}</div></div>`)}
+function renderFuel(){
+ $('#formHost').innerHTML=`<div class="section-title"><div><h2>Түлш</h2><p>Нэгтгэл түлш + техник тус бүр + түлш олголтын бүртгэл.</p></div></div>
+ <h3>Нэгтгэл түлш</h3><div class="grid two"><div class="form-card storage-row" data-storage="fuel_truck"><h3>Түлшний машин / Заправщик</h3><div class="form-grid">${num('income_liter','Орлого л')}${num('opening_stock_liter','Эхний үлдэгдэл л')}${num('issued_to_machine_liter','Машинд олгосон л')}${num('issued_to_plant_liter','Үйлдвэрт олгосон л')}${num('issued_to_station_liter','ШТС / нөөц рүү л')}${num('closing_stock_liter','Үлдэгдэл л')}</div></div>
+ <div class="form-card storage-row" data-storage="reserve_tank"><h3>Нөөцийн сав</h3><div class="form-grid">${num('income_liter','Орлого л')}${num('opening_stock_liter','Эхний үлдэгдэл л')}${num('issued_to_machine_liter','Машинд шилжүүлсэн л')}${num('issued_to_plant_liter','Үйлдвэрт л')}${num('closing_stock_liter','Үлдэгдэл л')}</div></div></div>
+ <h3>Техник тус бүрийн түлш</h3><div id="fuelEqRows"></div><button class="btn" type="button" onclick="addFuelEqRow()">+ Техникийн түлш</button>
+ <h3>Түлш олголтын бүртгэл</h3><div id="fuelIssueRows"></div><button class="btn" type="button" onclick="addFuelIssueRow()">+ Путёвк</button>`; addFuelEqRow(); addFuelIssueRow();
+}
+function addFuelEqRow(){ $('#fuelEqRows').insertAdjacentHTML('beforeend',`<div class="form-card fuel-eq-row"><div class="form-grid">${select('equipment_name','Техник',opts(EQUIPMENT_MASTER.map(x=>x[0]).concat(['Үйлдвэрт','Пуужин/генератор/грейдер'])))}${select('equipment_group','Бүлэг','<option value="own">Өөрийн техник</option><option value="product_transport">Бүтээгдэхүүн тээвэр</option><option value="rental_sludge">Түрээс шлам</option><option value="support">Туслах</option><option value="plant">Үйлдвэр</option>')}${num('fuel_liter','Зарцуулсан түлш л','1')}${num('meter_value','Мото цаг / заалт')}</div><div class="row-actions">${rowDelete()}</div></div>`)}
+function addFuelIssueRow(){ $('#fuelIssueRows').insertAdjacentHTML('beforeend',`<div class="form-card fuel-issue-row"><div class="form-grid">${text('voucher_no','Путёвк №')}${select('equipment_name','Техник',opts(EQUIPMENT_MASTER.map(x=>x[0])))}${text('operator_name','Оператор / жолооч')}${num('issued_liter','Авсан литр','1')}${num('meter_reading','Тоолуур / мото цаг')}<div class="field"><label>Гарын үсэг</label><select name="confirmed"><option value="1">Баталгаажсан</option><option value="0">Үгүй</option></select></div></div><div class="row-actions">${rowDelete()}</div></div>`)}
+function renderEquipment(){
+ $('#formHost').innerHTML=`<div class="section-title"><div><h2>Техник</h2><p>1 = ажилласан, засварт, парк гэсэн утгыг form-оор цэгцэлнэ.</p></div></div><div id="equipmentRows"></div><button class="btn" type="button" onclick="addEquipmentRow()">+ Техник статус</button>`; addEquipmentRow();
+}
+function addEquipmentRow(){ $('#equipmentRows').insertAdjacentHTML('beforeend',`<div class="form-card equipment-row"><div class="form-grid">${select('equipment_name','Техник',opts(EQUIPMENT_MASTER.map(x=>x[0])))}${select('equipment_group','Бүлэг','<option value="main">Үндсэн техник</option><option value="product_transport_rental">Бүтээгдэхүүн тээвэр түрээс</option><option value="sludge_transport_rental">Шлам тээвэр түрээс</option><option value="support">Туслах</option>')}${select('shift','Ээлж','<option value="full_day">Бүтэн өдөр</option><option value="day">Өдөр</option><option value="night">Шөнө</option>')}${select('status','Төлөв','<option value="working">Ажилласан</option><option value="repair">Засварт</option><option value="parked">Парк</option><option value="unknown">Тодорхойгүй</option>')}<div class="field"><label>Тайлбар</label><input name="note"></div></div><div class="row-actions">${rowDelete()}</div></div>`)}
+function renderCamp(){ $('#formHost').innerHTML=`<div class="section-title"><div><h2>Кемп / хүн хүч</h2><p>Кемп менежер зөвхөн энэ хэсгийг бөглөнө.</p></div></div><div class="form-card"><div class="form-grid">${num('mongolian_count','Монгол ажилтан','1')}${num('chinese_count','Хятад ажилтан','1')}${num('total_people','Нийт хүн','1')}${num('guard_count','Харуул','1')}${num('guest_count','Түр зочин','1')}${num('outside_meal_count','Гаднаас хооллосон хүн','1')}${num('contractor_count','Барилга / туслан','1')}${num('camp_staff_count','Кемпийн ажилтан','1')}${num('cook_count','Тогооч','1')}${num('cleaner_count','Үйлчлэгч','1')}${num('laundry_count','Хувцас угаагч','1')}${num('household_count','Аж ахуй','1')}<div class="field"><label>Тайлбар</label><textarea name="note"></textarea></div></div></div>` }
+function renderSafety(){ $('#formHost').innerHTML=`<div class="section-title"><div><h2>ХАБЭА</h2><p>Аюулгүй ажиллагаа, цаг агаар.</p></div></div><div class="form-card"><div class="form-grid">${num('medical_aid','Эмнэлгийн тусламж','1')}${num('hse_violation','ХАБ зөрчил','1')}${num('day_temp_c','Өдрийн хэм ℃')}${num('night_temp_c','Шөнийн хэм ℃')}${num('humidity_pct','Чийг %')}${num('wind_speed_ms','Салхины хурд м/с')}<div class="field"><label>Тайлбар</label><textarea name="note"></textarea></div></div></div>` }
+function renderIssues(){ $('#formHost').innerHTML=`<div class="section-title"><div><h2>Үйлдвэрийн асуудал</h2><p>Тулгарсан асуудал хоосон байж болно.</p></div></div><div id="issueRows"></div><button class="btn" type="button" onclick="addIssueRow()">+ Асуудал</button>`; addIssueRow(); }
+function addIssueRow(){ $('#issueRows').insertAdjacentHTML('beforeend',`<div class="form-card issue-row"><div class="form-grid"><div class="field"><label>Асуудлын тайлбар</label><textarea name="issue_text"></textarea></div>${select('severity','Ноцтой байдал','<option value="low">Бага</option><option value="medium">Дунд</option><option value="high">Өндөр</option>')}${select('status','Төлөв','<option value="open">Нээлттэй</option><option value="resolved">Шийдсэн</option>')}${text('responsible_person','Хариуцсан хүн')}<div class="field"><label>Авсан арга хэмжээ</label><textarea name="action_taken"></textarea></div></div><div class="row-actions">${rowDelete()}</div></div>`)}
+function fd(root){ const o={}; $$('input,select,textarea',root).forEach(i=>{ if(i.name) o[i.name]= i.type==='number' ? n(i.value) : i.value; }); return o; }
+function payloadProduction(){return {shifts:$$('[data-shift]').map(x=>({shift:x.dataset.shift,...fd(x)})).filter(r=>Object.values(r).some(v=>v!==''&&v!==null)), lab_samples:$$('.lab-row').map(fd).filter(r=>r.sample_time || r.luojing_ad!==null || r.fumei_ad!==null || r.caking_g!==null)}}
+function payloadTransport(){return {records:$$('.transport-row').map(fd).filter(r=>r.trips!==null||r.ton_weight!==null), weighbridge:$$('.weigh-row').map(fd).filter(r=>r.gross_weight_kg!==null||r.tare_weight_kg!==null)}}
+function payloadFuel(){return {storage:$$('.storage-row').map(x=>({storage_type:x.dataset.storage,...fd(x)})), equipment:$$('.fuel-eq-row').map(fd).filter(r=>r.fuel_liter!==null), issues:$$('.fuel-issue-row').map(fd).filter(r=>r.issued_liter!==null)}}
+function payloadEquipment(){return {statuses:$$('.equipment-row').map(fd).filter(r=>r.equipment_name)}}
+function payloadCamp(){return fd($('#formHost'))}
+function payloadSafety(){return fd($('#formHost'))}
+function payloadIssues(){return {issues:$$('.issue-row').map(fd).filter(r=>String(r.issue_text||'').trim())}}
+function render(){ const d=$('#department').value; ({production:renderProduction,transport:renderTransport,fuel:renderFuel,equipment:renderEquipment,camp:renderCamp,safety:renderSafety,issues:renderIssues}[d])(); }
+async function submit(){
+ const department=$('#department').value; const getters={production:payloadProduction,transport:payloadTransport,fuel:payloadFuel,equipment:payloadEquipment,camp:payloadCamp,safety:payloadSafety,issues:payloadIssues};
+ const body={date:$('#dateInput').value, department, pin:$('#pin').value, payload:getters[department]()};
+ setStatus($('#status'),'Илгээж байна...');
+ try{ const res=await api('/api/submit',{method:'POST',body:JSON.stringify(body)}); setStatus($('#status'),`Амжилттай хадгаллаа. Submission #${res.submission_id}`,'ok'); }
+ catch(e){ setStatus($('#status'),`Алдаа: ${e.message}`,'bad'); }
+}
+$('#department').onchange=render; $('#submitBtn').onclick=submit; render();
+</script></body></html>

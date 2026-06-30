@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="mn"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Админ — GRD V2</title><link rel="stylesheet" href="style.css"></head>
+<body>
+<header class="topbar"><div class="container topbar-inner"><a class="brand" href="index.html"><span class="brand-mark">GRD</span><span>Говь Ресурс Девелопмент ХХК</span></a><nav class="nav"><a href="index.html">Dashboard</a><a href="report.html">Тайлан илгээх</a><a class="active" href="admin.html">Админ</a><button id="themeToggle">Dark/Light</button></nav></div></header>
+<main class="container">
+<section class="hero"><h1>Админ</h1><p>Сарын өртөг, түлшний үнэ, элэгдэл, түүхэн дата. Анхны MVP дээр PIN ашиглана.</p></section>
+<section class="panel">
+<div class="section-title"><div><h2>Сарын actual / өртгийн параметр</h2><p>Cost A = машины түлш; Cost B = машин + үйлдвэрийн түлш.</p></div></div>
+<div class="form-card"><div class="form-grid">
+<div class="field"><label>Admin PIN</label><input id="pin" type="password" placeholder="9999"></div>
+<div class="field"><label>Сар</label><input id="month" type="month"></div>
+<div class="field"><label>Баяжуулсан нүүрс тн</label><input id="clean" type="number" step="0.01"></div>
+<div class="field"><label>Шлам тн</label><input id="shlam" type="number" step="0.01"></div>
+<div class="field"><label>Хаягдал тн</label><input id="waste" type="number" step="0.01"></div>
+<div class="field"><label>Машины түлш л</label><input id="machineFuel" type="number" step="0.01"></div>
+<div class="field"><label>Үйлдвэрийн түлш л</label><input id="plantFuel" type="number" step="0.01"></div>
+<div class="field"><label>Түрээс тээврийн зардал ₮</label><input id="rental" type="number" step="1"></div>
+<div class="field"><label>Түлшний үнэ ₮/л</label><input id="fuelPrice" type="number" step="1" value="4250"></div>
+<div class="field"><label>1 техникийн элэгдэл ₮/сар</label><input id="depPerVehicle" type="number" step="1" value="1500000"></div>
+<div class="field"><label>Өөрийн техник тоо</label><input id="vehicleCount" type="number" step="1" value="4"></div>
+<div class="field"><label>USD/MNT</label><input id="usd" type="number" step="0.01" value="3576"></div>
+<div class="field"><label>Тайлбар</label><textarea id="note"></textarea></div>
+</div><div class="row-actions"><button class="btn primary" id="saveBtn">Хадгалах</button><span id="status" class="muted"></span></div></div>
+</section>
+<section class="panel" id="history"></section>
+<div class="footer">Users/PIN өөрчлөх table-г дараагийн хувилбарт UI-тай болгоно. Одоогоор schema.sql дээр seed PIN байна.</div>
+</main><script src="app.js"></script><script>
+initTheme(); $('#month').value=monthISO();
+async function save(){ const body={pin:$('#pin').value,month:$('#month').value,actual:{clean_coal_ton:n($('#clean').value),shlam_ton:n($('#shlam').value),waste_ton:n($('#waste').value),machine_fuel_liter:n($('#machineFuel').value),generator_fuel_liter:n($('#plantFuel').value),rental_transport_mnt:n($('#rental').value),source_note:$('#note').value},params:{fuel_price_mnt_l:n($('#fuelPrice').value),depreciation_per_vehicle_mnt:n($('#depPerVehicle').value),own_vehicle_count:n($('#vehicleCount').value),usd_mnt:n($('#usd').value)}}; setStatus($('#status'),'Хадгалж байна...'); try{await api('/api/admin/monthly-actual',{method:'POST',body:JSON.stringify(body)}); setStatus($('#status'),'Хадгаллаа','ok'); loadHistory();}catch(e){setStatus($('#status'),'Алдаа: '+e.message,'bad')}}
+async function loadHistory(){try{const m=$('#month').value||monthISO(); const data=await api('/api/monthly-summary?month='+m); $('#history').innerHTML='<div class="section-title"><div><h2>Түүхэн дата</h2><p>Seed + админ оруулсан дата</p></div></div>'+table(['Сар','Баяжуулсан','Шлам','Хаягдал','Cost A','Cost B'],(data.historical||[]).map(r=>`<tr><td>${r.month}</td><td>${show(r.clean_coal_ton)}</td><td>${show(r.shlam_ton)}</td><td>${show(r.waste_ton)}</td><td>${r.cost_a_mnt_ton?moneyFmt.format(r.cost_a_mnt_ton):'—'}</td><td>${r.cost_b_mnt_ton?moneyFmt.format(r.cost_b_mnt_ton):'—'}</td></tr>`));}catch(e){$('#history').innerHTML='<div class="notice">D1 холбогдоогүй байна: '+esc(e.message)+'</div>'}}
+$('#saveBtn').onclick=save; $('#month').onchange=loadHistory; loadHistory();
+</script></body></html>
