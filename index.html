@@ -1,118 +1,57 @@
 <!doctype html>
 <html lang="mn">
 <head>
-  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Говь Ресурс Девелопмент ХХК — V2 Dashboard</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Говь Ресурс Девелопмент ХХК — Нэвтрэх</title>
   <link rel="stylesheet" href="style.css">
 </head>
-<body>
-<header class="topbar"><div class="container topbar-inner">
-  <a class="brand" href="index.html"><span class="brand-mark">GRD</span><span>Говь Ресурс Девелопмент ХХК</span></a>
-  <nav class="nav"><a class="active" href="index.html">Dashboard</a><a href="report.html">Тайлан илгээх</a><a href="admin.html">Админ</a><button id="themeToggle">Dark/Light</button></nav>
-</div></header>
-<main class="container">
-  <section class="hero">
-    <h1>Dashboard</h1>
-    <p>Удирдлага огноо болон сараа сонгож module бүрийн тайланг харна. Summary KPI-г дараагийн шатанд тусад нь сонгоно.</p>
-    <div class="toolbar">
-      <div class="field"><label>Огноо</label><input id="dateInput" type="date"></div>
-      <div class="field"><label>Сар</label><input id="monthInput" type="month"></div>
-      <button class="btn primary" id="loadBtn">Ачаалах</button>
-      <span id="loadStatus" class="muted"></span>
-    </div>
-  </section>
-
-  <section id="statusPanel" class="panel"></section>
-
-  <div class="split">
-    <aside class="side panel">
-      <div class="section-title"><div><h2>Тайлангийн хэсгүүд</h2><p>Эхний шатанд тус бүр дээр нь ажиллана.</p></div></div>
-      <button class="tab active" data-tab="production">Үйлдвэрлэл / Лаб</button>
-      <button class="tab" data-tab="transport">Тээвэр</button>
-      <button class="tab" data-tab="fuel">Түлш</button>
-      <button class="tab" data-tab="equipment">Техник</button>
-      <button class="tab" data-tab="camp">Кемп</button>
-      <button class="tab" data-tab="safety">ХАБЭА</button>
-      <button class="tab" data-tab="issues">Асуудал</button>
-    </aside>
-    <section>
-      <div id="production" class="module panel"></div>
-      <div id="transport" class="module panel hidden"></div>
-      <div id="fuel" class="module panel hidden"></div>
-      <div id="equipment" class="module panel hidden"></div>
-      <div id="camp" class="module panel hidden"></div>
-      <div id="safety" class="module panel hidden"></div>
-      <div id="issues" class="module panel hidden"></div>
+<body class="login-body">
+  <main class="login-shell">
+    <section class="brand-block">
+      <div class="brand-logo" aria-hidden="true">
+        <svg class="logo-mark" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <path d="M32 5 59 55H43L32 35 21 55H5L32 5Z" fill="white" opacity=".96"/>
+          <path d="M32 18 44 42H20L32 18Z" fill="#c9202f"/>
+          <path d="M9 55h46L42 43H22L9 55Z" fill="white" opacity=".96"/>
+        </svg>
+      </div>
+      <h1 class="brand-title">ГОВЬ РЕСУРС ДЕВЕЛОПМЕНТ ХХК</h1>
+      <p class="brand-subtitle">Өдөр тутмын үйл ажиллагааны систем</p>
     </section>
-  </div>
-  <div class="footer">V2 MVP — Cloudflare Pages Functions + D1</div>
-</main>
-<script src="app.js"></script>
-<script>
-initTheme();
-const sample = {
-  ok:true,date:'2026-05-31',month:'2026-05',
-  reportStatus:{camp:true,transport:true,fuel:true,equipment:true,production:true,safety:true,issues:false},
-  production:{shifts:[{shift:'day',meter_value:22,product_ton:280,middling_ton:null,fuel_liter:149},{shift:'night',meter_value:21,product_ton:290,middling_ton:null,fuel_liter:128}],totalProduct:570,totalFuel:277,totalMeter:43,labAverages:{luojing_ad:9.86,fumei_ad:10.01,caking_g:85.25}},
-  transport:{byType:{shalaam:{trips:37,ton:1591},waste:{trips:15,ton:645},short_waste:{trips:27,ton:1161},product:{trips:0,ton:0}},weighbridge:{trips:0,ton:0,invalid:0}},
-  fuel:{storage:[{storage_type:'fuel_truck',income_liter:null,opening_stock_liter:5928,total_expense_liter:0,closing_stock_liter:null},{storage_type:'reserve_tank',income_liter:null,opening_stock_liter:67032,total_expense_liter:0,closing_stock_liter:67032}],totalClosingStock:67032,totalExpense:0,equipmentTotal:0,issueTotal:0},
-  equipment:{counts:{working:24,repair:0,parked:0,unknown:0},byGroup:{main:{working:14},sludge_transport_rental:{working:10}}},
-  camp:{total_people:80,mongolian_count:29,chinese_count:51,outside_meal_count:4,guest_count:0},
-  safety:{medical_aid:0,hse_violation:0,day_temp_c:null,night_temp_c:null,humidity_pct:null,wind_speed_ms:null},
-  issues:[],warnings:[]
-};
-let currentDaily = sample;
-function statusBadge(v){ return v ? '<span class="pill ok">✅ ирсэн</span>' : '<span class="pill bad">❌ ирээгүй</span>'; }
-function renderStatus(d){
-  const depts=[['camp','Кемп'],['transport','Тээвэр'],['fuel','Түлш'],['equipment','Техник'],['production','Үйлдвэрлэл'],['safety','ХАБЭА'],['issues','Асуудал']];
-  $('#statusPanel').innerHTML = `<div class="section-title"><div><h2>${esc(d.date)} тайлангийн төлөв</h2><p>Summary KPI-г дараа сонгоно. Одоогоор data бүрдэл болон module дүн харагдана.</p></div></div>`+
-    `<div class="grid cards">${depts.map(([k,label])=>`<div class="card"><div class="label">${label}</div><div class="sub">${statusBadge(d.reportStatus?.[k])}</div></div>`).join('')}</div>`+
-    `${(d.warnings||[]).length?`<div class="notice" style="margin-top:14px"><b>Анхааруулга:</b><br>${d.warnings.map(esc).join('<br>')}</div>`:''}`;
-}
-function renderProduction(d){
- const p=d.production||{};
- $('#production').innerHTML=`<div class="section-title"><div><h2>Үйлдвэрлэл / Лаборатори</h2><p>Хятад ажилчны bilingual form-оос татагдана.</p></div></div>
- <div class="grid cards">
-  <div class="card"><div class="label">24 цагийн бүтээгдэхүүн</div><div class="value">${show(p.totalProduct)} тн</div></div>
-  <div class="card"><div class="label">Үйлдвэрийн түлш</div><div class="value">${show(p.totalFuel)} л</div></div>
-  <div class="card"><div class="label">Тоолуур / цахилгаан</div><div class="value">${show(p.totalMeter)}</div></div>
-  <div class="card"><div class="label">Түлш / тн</div><div class="value">${p.totalProduct?show(p.totalFuel/p.totalProduct):'—'} л/тн</div></div>
- </div>
- <h3>Ээлжийн үйлдвэрлэл</h3>`+
- table(['Ээлж','Тоолуур','Бүтээгдэхүүн тн','Мидлинг тн','Түлш л'], (p.shifts||[]).map(r=>`<tr><td>${r.shift==='day'?'Өдөр / 白班':'Шөнө / 夜班'}</td><td>${show(r.meter_value)}</td><td>${show(r.product_ton)}</td><td>${show(r.middling_ton)}</td><td>${show(r.fuel_liter)}</td></tr>`))+
- `<h3>Лабораторийн дундаж</h3><div class="grid three"><div class="card"><div class="label">螺精Ad</div><div class="value">${show(p.labAverages?.luojing_ad)}</div></div><div class="card"><div class="label">浮煤Ad</div><div class="value">${show(p.labAverages?.fumei_ad)}</div></div><div class="card"><div class="label">粘结G</div><div class="value">${show(p.labAverages?.caking_g)}</div></div></div>`;
-}
-function typeLabel(k){return {shalaam:'Шлам',waste:'Хаягдал',short_waste:'Богино дотор рейс',product:'Бүтээгдэхүүн'}[k]||k}
-function renderTransport(d){
- const t=d.transport||{}; const by=t.byType||{};
- const rows=['shalaam','waste','short_waste','product'].map(k=>{const v=by[k]||{};return `<tr><td>${typeLabel(k)}</td><td>${showInt(v.trips)}</td><td>${show(v.ton)}</td><td>${v.trips?show(v.ton/v.trips):'—'}</td></tr>`});
- $('#transport').innerHTML=`<div class="section-title"><div><h2>Тээвэр</h2><p>Пүүний мэдээлэл тээвэр module-ийн дэд хэсэг.</p></div></div>
- <div class="grid cards"><div class="card"><div class="label">Шлам</div><div class="value">${show(by.shalaam?.ton)} тн</div><div class="sub">${showInt(by.shalaam?.trips)} рейс</div></div><div class="card"><div class="label">Нийт хаягдал</div><div class="value">${show((by.waste?.ton||0)+(by.short_waste?.ton||0))} тн</div><div class="sub">Хаягдал + богино рейс</div></div><div class="card"><div class="label">Бүтээгдэхүүн тээвэр</div><div class="value">${show(by.product?.ton)} тн</div></div><div class="card"><div class="label">Пүүний бодит жин</div><div class="value">${show(t.weighbridge?.ton)} тн</div><div class="sub">${showInt(t.weighbridge?.trips)} баталгаатай мөр</div></div></div>
- <h3>Тээврийн төрлөөр</h3>${table(['Төрөл','Рейс','Тонн','Дундаж тн/рейс'], rows)}
- <h3>Пүүний мэдээлэл</h3>${table(['Үзүүлэлт','Утга'],[`<tr><td>Баталгаатай пүүний рейс</td><td>${showInt(t.weighbridge?.trips)}</td></tr>`,`<tr><td>Баталгаатай цэвэр жин</td><td>${show(t.weighbridge?.ton)} тн</td></tr>`,`<tr><td>Буруу/сэжигтэй мөр</td><td>${showInt(t.weighbridge?.invalid)}</td></tr>`])}`;
-}
-function renderFuel(d){
- const f=d.fuel||{};
- $('#fuel').innerHTML=`<div class="section-title"><div><h2>Түлш</h2><p>Нэгтгэл түлш + техник тус бүр + түлш олголтын form.</p></div></div>
- <div class="grid cards"><div class="card"><div class="label">Нийт үлдэгдэл</div><div class="value">${show(f.totalClosingStock)} л</div></div><div class="card"><div class="label">Нэгтгэлийн зарлага</div><div class="value">${show(f.totalExpense)} л</div></div><div class="card"><div class="label">Техник тус бүр</div><div class="value">${show(f.equipmentTotal)} л</div></div><div class="card"><div class="label">Путёвк / олголт</div><div class="value">${show(f.issueTotal)} л</div></div></div>
- <h3>Түлшний машин / нөөцийн сав</h3>${table(['Төрөл','Орлого','Эхний үлдэгдэл','Нийт зарлага','Үлдэгдэл'], (f.storage||[]).map(r=>`<tr><td>${r.storage_type==='fuel_truck'?'Түлшний машин':'Нөөцийн сав'}</td><td>${show(r.income_liter)}</td><td>${show(r.opening_stock_liter)}</td><td>${show(r.total_expense_liter)}</td><td>${show(r.closing_stock_liter)}</td></tr>`))}`;
-}
-function renderEquipment(d){
- const e=d.equipment||{}, c=e.counts||{};
- $('#equipment').innerHTML=`<div class="section-title"><div><h2>Техник</h2><p>Ажилласан / засварт / парк тусдаа хадгалагдана.</p></div></div>
- <div class="grid cards"><div class="card"><div class="label">Ажилласан</div><div class="value">${showInt(c.working)}</div></div><div class="card"><div class="label">Засварт</div><div class="value bad">${showInt(c.repair)}</div></div><div class="card"><div class="label">Парк</div><div class="value">${showInt(c.parked)}</div></div><div class="card"><div class="label">Тодорхойгүй</div><div class="value">${showInt(c.unknown)}</div></div></div>
- <h3>Бүлгээр</h3>${table(['Бүлэг','Ажилласан','Засварт','Парк'], Object.entries(e.byGroup||{}).map(([g,v])=>`<tr><td>${esc(g)}</td><td>${showInt(v.working)}</td><td>${showInt(v.repair)}</td><td>${showInt(v.parked)}</td></tr>`))}`;
-}
-function renderCamp(d){const c=d.camp||{};$('#camp').innerHTML=`<div class="section-title"><div><h2>Кемп / хүн хүч</h2><p>Кемп менежер зөвхөн өөрийн хэсгээ бөглөнө.</p></div></div><div class="grid cards"><div class="card"><div class="label">Нийт хүн</div><div class="value">${showInt(c.total_people)}</div></div><div class="card"><div class="label">Монгол</div><div class="value">${showInt(c.mongolian_count)}</div></div><div class="card"><div class="label">Хятад</div><div class="value">${showInt(c.chinese_count)}</div></div><div class="card"><div class="label">Гаднаас хооллосон</div><div class="value">${showInt(c.outside_meal_count)}</div></div></div>`}
-function renderSafety(d){const s=d.safety||{};$('#safety').innerHTML=`<div class="section-title"><div><h2>ХАБЭА</h2><p>Эмнэлгийн тусламж, зөрчил, цаг агаар.</p></div></div><div class="grid cards"><div class="card"><div class="label">Эмнэлгийн тусламж</div><div class="value">${showInt(s.medical_aid)}</div></div><div class="card"><div class="label">ХАБ зөрчил</div><div class="value">${showInt(s.hse_violation)}</div></div><div class="card"><div class="label">Өдөр / шөнө</div><div class="value">${show(s.day_temp_c)} / ${show(s.night_temp_c)} ℃</div></div><div class="card"><div class="label">Чийг / салхи</div><div class="value">${show(s.humidity_pct)}% / ${show(s.wind_speed_ms)} м/с</div></div></div>`}
-function renderIssues(d){$('#issues').innerHTML=`<div class="section-title"><div><h2>Үйлдвэрийн асуудал</h2><p>Issue log.</p></div></div>`+table(['№','Асуудал','Ноцтой байдал','Төлөв','Арга хэмжээ'],(d.issues||[]).map((r,i)=>`<tr><td>${i+1}</td><td>${esc(r.issue_text)}</td><td>${esc(r.severity||'')}</td><td>${esc(r.status||'')}</td><td>${esc(r.action_taken||'')}</td></tr>`))}
-function renderAll(d){ currentDaily=d; renderStatus(d); renderProduction(d); renderTransport(d); renderFuel(d); renderEquipment(d); renderCamp(d); renderSafety(d); renderIssues(d); }
-async function load(){
- const date=$('#dateInput').value || todayISO(); $('#dateInput').value=date; $('#monthInput').value = $('#monthInput').value || date.slice(0,7); setStatus($('#loadStatus'),'Ачаалж байна...');
- try{ const data=await api(`/api/daily-summary?date=${date}`); renderAll(data); setStatus($('#loadStatus'),'Амжилттай','ok'); }
- catch(e){ renderAll({...sample,date,month:date.slice(0,7),warnings:[`API/D1 холбогдоогүй тул demo дата харуулж байна: ${e.message}`]}); setStatus($('#loadStatus'),'Demo горим','warn'); }
-}
-$$('.side .tab').forEach(b=>b.onclick=()=>{$$('.side .tab').forEach(x=>x.classList.remove('active')); b.classList.add('active'); $$('.module').forEach(x=>x.classList.add('hidden')); $('#'+b.dataset.tab).classList.remove('hidden');});
-$('#loadBtn').onclick=load; $('#dateInput').value=todayISO(); $('#monthInput').value=monthISO(); load();
-</script>
-</body></html>
+
+    <section class="login-card">
+      <div class="login-head">
+        <h1>Нэвтрэх</h1>
+        <p>Системд нэвтрэхийн тулд мэдээллээ оруулна уу.</p>
+      </div>
+      <form id="loginForm" class="form-grid" autocomplete="on">
+        <div id="loginMessage"></div>
+        <div class="field">
+          <label for="username">Нэвтрэх нэр</label>
+          <div class="input-wrap">
+            <span class="icon">☻</span>
+            <input id="username" name="username" type="text" placeholder="Хэрэглэгчийн нэр" required>
+          </div>
+        </div>
+        <div class="field">
+          <label for="pin">PIN код</label>
+          <div class="input-wrap">
+            <span class="icon">🔒</span>
+            <input id="pin" name="pin" type="password" inputmode="numeric" placeholder="PIN кодоо оруулна уу" required>
+          </div>
+        </div>
+        <label class="check-row">
+          <input id="remember" type="checkbox">
+          <span>Намайг сана</span>
+        </label>
+        <button class="btn btn-primary" type="submit">Нэвтрэх</button>
+        <div class="divider">эсвэл</div>
+        <a class="btn btn-soft" href="report.html">Тайлан оруулах хуудас руу очих</a>
+      </form>
+    </section>
+    <footer class="footer-note">© 2026 Говь Ресурс Девелопмент ХХК. Бүх эрх хуулиар хамгаалагдсан.</footer>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

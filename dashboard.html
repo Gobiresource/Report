@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="mn">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GRD Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="app-body" data-page="dashboard">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="top-brand" href="dashboard.html">
+        <span class="mini-logo" aria-hidden="true">
+          <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M32 5 59 55H43L32 35 21 55H5L32 5Z" fill="white"/><path d="M32 18 44 42H20L32 18Z" fill="#c9202f"/><path d="M9 55h46L42 43H22L9 55Z" fill="white"/></svg>
+        </span>
+        <span><h1>Говь Ресурс Девелопмент ХХК</h1><p>Dashboard</p></span>
+      </a>
+      <div class="top-actions">
+        <a class="btn btn-soft" href="report.html">Тайлан</a>
+        <span id="userPill" class="user-pill"></span>
+        <button id="logoutBtn" class="btn btn-soft">Гарах</button>
+      </div>
+    </div>
+  </header>
+  <main class="main">
+    <section class="hero">
+      <div class="hero-row">
+        <div>
+          <h2>Dashboard нүүр</h2>
+          <p>Удирдлага сараа сонгож тухайн сарын өдөр тутмын мэдээлэл рүү орно.</p>
+        </div>
+        <div class="date-tools">
+          <select id="monthSelect" aria-label="Сар сонгох">
+            <option value="2026-06">2026 оны 6 сар</option>
+            <option value="2026-07" disabled>2026 оны 7 сар — удахгүй</option>
+            <option value="2026-08" disabled>2026 оны 8 сар — удахгүй</option>
+          </select>
+          <button class="btn btn-dark" id="openMonthBtn">Сонгосон сараар орох</button>
+        </div>
+      </div>
+    </section>
+
+    <section id="monthHome" class="panel">
+      <div class="panel-head">
+        <div>
+          <h3>Сарууд</h3>
+          <p>Эхний шатанд өдөр тутмын module-ууд дээр ажиллана. Summary KPI-г дараа сонгоно.</p>
+        </div>
+      </div>
+      <div class="month-grid">
+        <button class="month-card" data-month="2026-06">
+          <span><h3>6 сар</h3><p>2026-06 — идэвхтэй</p></span>
+          <span class="badge badge-ok">Нээх</span>
+        </button>
+        <div class="month-card disabled"><span><h3>7 сар</h3><p>2026-07 — удахгүй</p></span><span class="badge badge-muted">Удахгүй</span></div>
+        <div class="month-card disabled"><span><h3>8 сар</h3><p>2026-08 — удахгүй</p></span><span class="badge badge-muted">Удахгүй</span></div>
+      </div>
+    </section>
+
+    <section id="monthDashboard" class="layout hidden">
+      <aside class="sidebar">
+        <h3 id="monthTitle">2026 оны 6 сар</h3>
+        <p>Module бүр дээр тус тусад нь ажиллана.</p>
+        <div class="nav-list" id="moduleNav"></div>
+      </aside>
+      <div id="modulePanel"></div>
+    </section>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>
