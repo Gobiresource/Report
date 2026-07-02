@@ -9,11 +9,11 @@
 <body class="app-body" data-page="report">
   <header class="topbar">
     <div class="topbar-inner">
-      <a class="top-brand" href="index.html">
+      <a class="top-brand" href="report.html">
         <span class="mini-logo" aria-hidden="true">
           <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M32 5 59 55H43L32 35 21 55H5L32 5Z" fill="white"/><path d="M32 18 44 42H20L32 18Z" fill="#c9202f"/><path d="M9 55h46L42 43H22L9 55Z" fill="white"/></svg>
         </span>
-        <span><h1>Тайлан илгээх</h1><p>Эрхтэй хэсэг л харагдана</p></span>
+        <span><h1>Тайлан илгээх</h1><p>Говь Ресурс Девелопмент ХХК</p></span>
       </a>
       <div class="top-actions">
         <a class="btn btn-soft" href="dashboard.html">Dashboard</a>
@@ -24,46 +24,29 @@
   </header>
 
   <main class="report-shell">
-    <section id="reportLogin" class="login-card report-login">
-      <div class="login-head">
-        <h1>Тайлан оруулах</h1>
-        <p>Нэвтрэх нэр болон PIN оруулсны дараа зөвшөөрөгдсөн тайлангийн хэсэг гарна.</p>
-      </div>
-      <form id="reportLoginForm" class="form-grid">
-        <div id="reportLoginMessage"></div>
-        <div class="field">
-          <label for="reportUsername">Нэвтрэх нэр</label>
-          <div class="input-wrap"><span class="icon">☻</span><input id="reportUsername" required placeholder="Жишээ: teever"></div>
-        </div>
-        <div class="field">
-          <label for="reportPin">PIN код</label>
-          <div class="input-wrap"><span class="icon">🔒</span><input id="reportPin" type="password" inputmode="numeric" required placeholder="PIN код"></div>
-        </div>
-        <button class="btn btn-primary" type="submit">Нэвтрэх</button>
-      </form>
-    </section>
-
     <section id="reportWorkspace" class="hidden">
       <section class="hero">
         <div class="hero-row">
           <div>
-            <h2>Тайлангийн хэсэг</h2>
-            <p>Доор зөвхөн таны оруулах эрхтэй тайлангууд харагдана.</p>
+            <h2>Өдрийн тайлан</h2>
+            <p>Огноогоо шалгаад, тайлангаа бөглөж илгээнэ үү.</p>
           </div>
           <div class="date-tools">
             <input id="reportDate" type="date">
           </div>
         </div>
       </section>
-      <section class="panel">
+
+      <section id="reportPicker" class="panel">
         <div class="panel-head">
           <div>
             <h3>Тайлангийн төрөл</h3>
-            <p>Эрхгүй хэсэг огт харагдахгүй.</p>
+            <p>Зөвхөн таны оруулах эрхтэй тайлангууд харагдана.</p>
           </div>
         </div>
         <div id="allowedReports" class="permission-grid"></div>
       </section>
+
       <section id="formPanel" class="panel hidden">
         <div class="panel-head">
           <div>

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>GRD Dashboard</title>
+  <title>GRD — Удирдлагын Dashboard</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body class="app-body" data-page="dashboard">
@@ -13,58 +13,74 @@
         <span class="mini-logo" aria-hidden="true">
           <svg viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg"><path d="M32 5 59 55H43L32 35 21 55H5L32 5Z" fill="white"/><path d="M32 18 44 42H20L32 18Z" fill="#c9202f"/><path d="M9 55h46L42 43H22L9 55Z" fill="white"/></svg>
         </span>
-        <span><h1>Говь Ресурс Девелопмент ХХК</h1><p>Dashboard</p></span>
+        <span><h1>Говь Ресурс Девелопмент ХХК</h1><p>Удирдлагын Dashboard</p></span>
       </a>
       <div class="top-actions">
-        <a class="btn btn-soft" href="report.html">Тайлан</a>
+        <a class="btn btn-soft" href="report.html">Тайлан оруулах</a>
         <span id="userPill" class="user-pill"></span>
-        <button id="logoutBtn" class="btn btn-soft">Гарах</button>
+        <button id="logoutBtn" class="btn btn-soft hidden">Гарах</button>
       </div>
     </div>
   </header>
+
   <main class="main">
+
+    <!-- Өдрийн нэгтгэл -->
     <section class="hero">
       <div class="hero-row">
         <div>
-          <h2>Dashboard нүүр</h2>
-          <p>Удирдлага сараа сонгож тухайн сарын өдөр тутмын мэдээлэл рүү орно.</p>
+          <h2>Өдрийн нэгтгэл</h2>
+          <p>Хэлтэс бүрийн оруулсан тайлангаас автоматаар нэгтгэсэн байдал.</p>
         </div>
         <div class="date-tools">
-          <select id="monthSelect" aria-label="Сар сонгох">
-            <option value="2026-06">2026 оны 6 сар</option>
-            <option value="2026-07" disabled>2026 оны 7 сар — удахгүй</option>
-            <option value="2026-08" disabled>2026 оны 8 сар — удахгүй</option>
-          </select>
-          <button class="btn btn-dark" id="openMonthBtn">Сонгосон сараар орох</button>
+          <button class="btn btn-soft" id="prevDayBtn" title="Өмнөх өдөр">‹</button>
+          <input id="dashboardDate" type="date" aria-label="Огноо сонгох">
+          <button class="btn btn-soft" id="nextDayBtn" title="Дараагийн өдөр">›</button>
         </div>
       </div>
     </section>
 
-    <section id="monthHome" class="panel">
+    <div id="dashboardMessage"></div>
+
+    <!-- Тайлан ирсэн эсэх -->
+    <section class="panel">
       <div class="panel-head">
         <div>
-          <h3>Сарууд</h3>
-          <p>Эхний шатанд өдөр тутмын module-ууд дээр ажиллана. Summary KPI-г дараа сонгоно.</p>
+          <h3>Тайлангийн ирц</h3>
+          <p>Аль хэлтэс тайлангаа өгсөн, аль нь хүлээгдэж байгааг харуулна. Ирсэн тайлан дээр дарж дэлгэрэнгүйг үзнэ.</p>
         </div>
       </div>
-      <div class="month-grid">
-        <button class="month-card" data-month="2026-06">
-          <span><h3>6 сар</h3><p>2026-06 — идэвхтэй</p></span>
-          <span class="badge badge-ok">Нээх</span>
-        </button>
-        <div class="month-card disabled"><span><h3>7 сар</h3><p>2026-07 — удахгүй</p></span><span class="badge badge-muted">Удахгүй</span></div>
-        <div class="month-card disabled"><span><h3>8 сар</h3><p>2026-08 — удахгүй</p></span><span class="badge badge-muted">Удахгүй</span></div>
-      </div>
+      <div id="statusRow" class="status-row"></div>
     </section>
 
-    <section id="monthDashboard" class="layout hidden">
-      <aside class="sidebar">
-        <h3 id="monthTitle">2026 оны 6 сар</h3>
-        <p>Module бүр дээр тус тусад нь ажиллана.</p>
-        <div class="nav-list" id="moduleNav"></div>
-      </aside>
-      <div id="modulePanel"></div>
+    <!-- Гол үзүүлэлтүүд -->
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h3>Гол үзүүлэлтүүд</h3>
+          <p>Сонгосон өдрийн нэгтгэл дүн.</p>
+        </div>
+      </div>
+      <div id="summaryCards" class="cards"></div>
     </section>
+
+    <!-- Сонгосон module-ийн дэлгэрэнгүй -->
+    <div id="moduleDetail"></div>
+
+    <!-- Сарын нэгтгэл -->
+    <section class="panel">
+      <div class="panel-head">
+        <div>
+          <h3>Сарын нэгтгэл</h3>
+          <p>Тухайн сарын нийлбэр дүн.</p>
+        </div>
+        <div class="date-tools">
+          <input id="dashboardMonth" type="month" aria-label="Сар сонгох">
+        </div>
+      </div>
+      <div id="monthlyCards" class="cards cards-3"></div>
+    </section>
+
   </main>
   <script src="app.js"></script>
 </body>
