@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Admin — GRD</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='10' fill='%2315171A'/%3E%3Cpath d='M9 27 24 11 39 27' stroke='%23E3A538' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M5 35 24 19 43 35' stroke='%23E3A538' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round' opacity='.55'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="admin">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="nameplate" href="dashboard.html">
+        <span class="nameplate-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 27 24 11 39 27" stroke="#E3A538" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5 35 24 19 43 35" stroke="#E3A538" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity=".62"/>
+            <path d="M2 41 24 27 46 41" stroke="#E3A538" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity=".32"/>
+          </svg>
+        </span>
+        <span class="nameplate-text"><h1>Говь Ресурс Девелопмент</h1><p>Admin</p></span>
+      </a>
+      <div class="top-actions">
+        <a class="btn btn-soft" href="report.html">Тайлан</a>
+        <a class="btn btn-soft" href="dashboard.html">Хяналтын самбар</a>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <section class="bezel hero"><span class="tick-a"></span><span class="tick-b"></span>
+      <p class="eyebrow">Дараагийн шат</p>
+      <h2>Хэрэглэгчийн удирдлага</h2>
+      <p>Хэрэглэгч нэмэх, идэвхгүй болгох, PIN солих, тайлангийн эрх өөрчлөх боломж энд нэмэгдэнэ. Одоогоор эдгээр нь D1 Console-оор гараар удирдагдана.</p>
+    </section>
+
+    <section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head"><div><h3>Одоогийн хэрэглэгчид</h3><p>schema.sql-ийн seed мэдээлэл (D1 database дотор)</p></div></div>
+      <div class="table-wrap">
+        <table class="table">
+          <thead><tr><th>Нэвтрэх нэр</th><th>PIN</th><th>Эрх</th></tr></thead>
+          <tbody>
+            <tr><td>admin</td><td>9999</td><td>Удирдлага / бүх дашбоард</td></tr>
+            <tr><td>uildverlel</td><td>1111</td><td>Үйлдвэрлэл / Лаб</td></tr>
+            <tr><td>teever</td><td>2222</td><td>Тээвэр + пүүний мэдээлэл</td></tr>
+            <tr><td>tulsh</td><td>3333</td><td>Түлш</td></tr>
+            <tr><td>technik</td><td>4444</td><td>Техник</td></tr>
+            <tr><td>camp</td><td>5555</td><td>Кемп / хүн хүч</td></tr>
+            <tr><td>hse</td><td>6666</td><td>ХАБЭА</td></tr>
+            <tr><td>asuudal</td><td>7777</td><td>Асуудал</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+  </main>
+</body>
+</html>

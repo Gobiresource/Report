@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Тайлан оруулах — GRD</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='10' fill='%2315171A'/%3E%3Cpath d='M9 27 24 11 39 27' stroke='%23E3A538' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M5 35 24 19 43 35' stroke='%23E3A538' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round' opacity='.55'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="report">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="nameplate" href="report.html">
+        <span class="nameplate-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 27 24 11 39 27" stroke="#E3A538" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5 35 24 19 43 35" stroke="#E3A538" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity=".62"/>
+            <path d="M2 41 24 27 46 41" stroke="#E3A538" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity=".32"/>
+          </svg>
+        </span>
+        <span class="nameplate-text"><h1>Говь Ресурс Девелопмент</h1><p>Тайлан оруулах</p></span>
+      </a>
+      <div class="top-actions">
+        <a class="btn btn-soft" href="dashboard.html">Хяналтын самбар</a>
+        <span id="userPill" class="user-pill"></span>
+        <button id="logoutBtn" class="btn btn-soft hidden">Гарах</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="report-shell">
+
+    <section class="bezel hero"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="hero-row">
+        <div>
+          <p class="eyebrow">Өдрийн тайлан</p>
+          <h2>Мэдээллээ оруулна уу</h2>
+          <p>Огноогоо шалгаад, доорх form-ыг бөглөж илгээнэ.</p>
+        </div>
+        <div class="date-tools"><input id="reportDate" type="date"></div>
+      </div>
+    </section>
+
+    <div id="accessConfirm" class="bezel access-confirm"></div>
+
+    <section id="reportPicker" class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head">
+        <div><h3>Тайлангийн төрөл</h3><p>Зөвхөн таны оруулах эрхтэй тайлангууд харагдана.</p></div>
+      </div>
+      <div id="allowedReports" class="permission-grid"></div>
+    </section>
+
+    <section id="formPanel" class="bezel panel hidden"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head">
+        <div class="label-row">
+          <span id="formTag" class="asset-tag"></span>
+          <div><h3 id="formTitle">Тайлан</h3><p id="formDesc">Мэдээллээ бөглөөд илгээнэ.</p></div>
+        </div>
+      </div>
+      <div id="submitMessage"></div>
+      <form id="dynamicReportForm" class="dynamic-form"></form>
+    </section>
+
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

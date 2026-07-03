@@ -1,0 +1,77 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>GRD — Хяналтын самбар</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='10' fill='%2315171A'/%3E%3Cpath d='M9 27 24 11 39 27' stroke='%23E3A538' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3Cpath d='M5 35 24 19 43 35' stroke='%23E3A538' stroke-width='3' fill='none' stroke-linecap='round' stroke-linejoin='round' opacity='.55'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="dashboard">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="nameplate" href="dashboard.html">
+        <span class="nameplate-mark" aria-hidden="true">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+            <path d="M9 27 24 11 39 27" stroke="#E3A538" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M5 35 24 19 43 35" stroke="#E3A538" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity=".62"/>
+            <path d="M2 41 24 27 46 41" stroke="#E3A538" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" opacity=".32"/>
+          </svg>
+        </span>
+        <span class="nameplate-text"><h1>Говь Ресурс Девелопмент</h1><p>Хяналтын самбар</p></span>
+      </a>
+      <div class="top-actions">
+        <a class="btn btn-soft" href="report.html">Тайлан оруулах</a>
+        <span id="userPill" class="user-pill"></span>
+        <button id="logoutBtn" class="btn btn-soft hidden">Гарах</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <section class="bezel hero"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="hero-row">
+        <div>
+          <p class="eyebrow">Өдрийн заалт</p>
+          <h2>Өнөөдрийн байдал</h2>
+          <p>Хэлтэс бүрийн оруулсан тайлангаас автоматаар нэгтгэсэн үзүүлэлт.</p>
+        </div>
+        <div class="date-tools">
+          <button class="btn btn-icon btn-soft" id="prevDayBtn" title="Өмнөх өдөр">‹</button>
+          <input id="dashboardDate" type="date" aria-label="Огноо сонгох">
+          <button class="btn btn-icon btn-soft" id="nextDayBtn" title="Дараагийн өдөр">›</button>
+        </div>
+      </div>
+    </section>
+
+    <div id="dashboardMessage"></div>
+
+    <section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head">
+        <div><h3>Тайлангийн ирц</h3><p>Ногоон гэрэлтэй дээр дарж дэлгэрэнгүйг харна.</p></div>
+      </div>
+      <div id="statusRow" class="status-row"></div>
+    </section>
+
+    <section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head">
+        <div><h3>Гол үзүүлэлтүүд</h3><p>Сонгосон өдрийн нэгтгэл дүн.</p></div>
+      </div>
+      <div id="summaryCards" class="cards"></div>
+    </section>
+
+    <div id="moduleDetail"></div>
+
+    <section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head">
+        <div><h3>Сарын нэгтгэл</h3><p>Тухайн сарын нийлбэр дүн.</p></div>
+        <div class="date-tools"><input id="dashboardMonth" type="month" aria-label="Сар сонгох"></div>
+      </div>
+      <div id="monthlyCards" class="cards cards-3"></div>
+    </section>
+
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

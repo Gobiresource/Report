@@ -1,0 +1,8 @@
+name = "govi-dashboard"
+compatibility_date = "2025-08-01"
+pages_build_output_dir = "."
+
+[[d1_databases]]
+binding = "DB"
+database_name = "govi_dashboard"
+database_id = "PASTE_D1_DATABASE_ID_HERE"
