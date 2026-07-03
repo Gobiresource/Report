@@ -18,14 +18,25 @@
    CONFIG — тайлангийн 7 модуль, тэдгээрийн form болон KPI тооцоолол
    ================================================================ */
 const CONFIG = (() => {
+  // Модуль бүрийн icon (16px stroke SVG, currentColor)
+  const I = {
+    factory:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 21V9l6 4V9l6 4V9l6 4v8H3z"/><path d="M7 21v-3M12 21v-3M17 21v-3"/></svg>',
+    truck:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 8h13v9H1zM14 11h4l4 3v3h-8z"/><circle cx="6" cy="19" r="1.6"/><circle cx="18" cy="19" r="1.6"/></svg>',
+    drop:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3s6.5 7 6.5 11.5a6.5 6.5 0 0 1-13 0C5.5 10 12 3 12 3z"/></svg>',
+    gear:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3.2"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M19.1 4.9 17 7M7 17l-2.1 2.1"/></svg>',
+    people:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M2.5 20c.8-3.4 3.4-5 6.5-5s5.7 1.6 6.5 5"/><path d="M16 5.5a3 3 0 0 1 0 5.6M18.5 15.5c1.8.7 2.8 2.2 3 4.5"/></svg>',
+    shield:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2 4.5 5v6c0 5 3.2 8.7 7.5 11 4.3-2.3 7.5-6 7.5-11V5L12 2z"/><path d="m8.8 12 2.2 2.2 4.2-4.4"/></svg>',
+    alert:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 1.8 20.5h20.4L12 3z"/><path d="M12 10v4.5M12 18h.01"/></svg>'
+  };
+
   const reportTypes = [
-    {key:'production', tag:'PRD', name:'Үйлдвэрлэл / Лаб', desc:'Бүтээгдэхүүн, цахилгаан, түлш, лабораторийн үзүүлэлт'},
-    {key:'transport',  tag:'TRN', name:'Тээвэр',            desc:'Шлам, хаягдал, богино рейс, бүтээгдэхүүн тээвэр, пүү'},
-    {key:'fuel',       tag:'FUE', name:'Түлш',              desc:'Нэгтгэл түлш, техник тус бүр, түлш олголт'},
-    {key:'equipment',  tag:'EQP', name:'Техник',            desc:'Ажилласан, засварт, парк'},
-    {key:'camp',       tag:'CMP', name:'Кемп / хүн хүч',    desc:'Ажилтан, зочин, хоол'},
-    {key:'hse',        tag:'HSE', name:'ХАБЭА',             desc:'Эмнэлгийн тусламж, зөрчил, цаг агаар'},
-    {key:'issue',      tag:'ISU', name:'Асуудал',           desc:'Үйлдвэрийн үйл ажиллагаанд тулгарсан асуудал'}
+    {key:'production', tag:'PRD', name:'Үйлдвэрлэл / Лаб', desc:'Бүтээгдэхүүн, цахилгаан, түлш, лабораторийн үзүүлэлт', color:'var(--c-production)', icon:I.factory},
+    {key:'transport',  tag:'TRN', name:'Тээвэр',            desc:'Шлам, хаягдал, богино рейс, бүтээгдэхүүн тээвэр, пүү', color:'var(--c-transport)', icon:I.truck},
+    {key:'fuel',       tag:'FUE', name:'Түлш',              desc:'Нэгтгэл түлш, техник тус бүр, түлш олголт', color:'var(--c-fuel)', icon:I.drop},
+    {key:'equipment',  tag:'EQP', name:'Техник',            desc:'Ажилласан, засварт, парк', color:'var(--c-equipment)', icon:I.gear},
+    {key:'camp',       tag:'CMP', name:'Кемп / хүн хүч',    desc:'Ажилтан, зочин, хоол', color:'var(--c-camp)', icon:I.people},
+    {key:'hse',        tag:'HSE', name:'ХАБЭА',             desc:'Эмнэлгийн тусламж, зөрчил, цаг агаар', color:'var(--c-hse)', icon:I.shield},
+    {key:'issue',      tag:'ISU', name:'Асуудал',           desc:'Үйлдвэрийн үйл ажиллагаанд тулгарсан асуудал', color:'var(--c-issue)', icon:I.alert}
   ];
 
   const forms = {
@@ -317,12 +328,37 @@ const PageDashboard = () => {
   }
 
   function renderStatusRow(){
+    const submitted = CONFIG.reportTypes.filter(t => dailyMap[t.key]).length;
+    const total = CONFIG.reportTypes.length;
+
+    // Ирцийн дугуй заалт (progress ring)
+    const ringBox = UI.$('#attendanceRing');
+    if(ringBox){
+      const R = 22, C = 2 * Math.PI * R;
+      ringBox.innerHTML = `<div class="ring-wrap">
+        <div class="ring-box">
+          <svg class="ring" width="52" height="52" viewBox="0 0 52 52">
+            <circle class="ring-bg" cx="26" cy="26" r="${R}" stroke-width="5"/>
+            <circle class="ring-fg" cx="26" cy="26" r="${R}" stroke-width="5"
+              stroke-dasharray="${C.toFixed(1)}" stroke-dashoffset="${C.toFixed(1)}"/>
+          </svg>
+          <span class="ring-label">${submitted}/${total}</span>
+        </div>
+        <span class="ring-cap">тайлан<br>ирсэн</span>
+      </div>`;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        const fg = UI.$('.ring-fg', ringBox);
+        if(fg) fg.style.strokeDashoffset = (C * (1 - submitted/total)).toFixed(1);
+      }));
+    }
+
     UI.$('#statusRow').innerHTML = CONFIG.reportTypes.map(t => {
       const r = dailyMap[t.key];
+      const chip = `<span class="mchip" style="background:${t.color}">${t.icon}</span>`;
       if(r){
         const time = (r.updated_at || '').slice(11,16);
         return `<button class="status-dial lit" data-key="${t.key}">
-          <span class="lamp"></span>
+          ${chip}
           <span class="dial-text">
             <span class="dial-name">${UI.esc(t.name)}</span>
             <span class="dial-meta">${UI.esc(r.submitted_by_name || '')}${time ? ' · '+time : ''}</span>
@@ -330,7 +366,7 @@ const PageDashboard = () => {
         </button>`;
       }
       return `<div class="status-dial pending">
-        <span class="lamp"></span>
+        ${chip}
         <span class="dial-text">
           <span class="dial-name">${UI.esc(t.name)}</span>
           <span class="dial-meta">Хүлээгдэж байна</span>
@@ -343,16 +379,17 @@ const PageDashboard = () => {
   function renderSummaryCards(){
     UI.$('#summaryCards').innerHTML = CONFIG.summaryCards.map(c => {
       const r = dailyMap[c.key];
-      const tag = CONFIG.reportTypes.find(t => t.key === c.key)?.tag || '';
+      const type = CONFIG.reportTypes.find(t => t.key === c.key) || {};
+      const chip = `<span class="mchip" style="background:${type.color}">${type.icon || ''}</span>`;
       if(!r){
         return `<div class="bezel card card-missing"><span class="tick-a"></span><span class="tick-b"></span>
-          <div class="card-tag-row"><span class="label">${UI.esc(c.label)}</span><span class="asset-tag">${tag}</span></div>
+          <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span></div>
           <div class="value">—</div><div class="sub">Тайлан ороогүй</div></div>`;
       }
       const val = c.calc(r.data);
       const warn = c.warnIf ? c.warnIf(r.data) : false;
       return `<div class="bezel card ${warn?'card-warn':''}"><span class="tick-a"></span><span class="tick-b"></span>
-        <div class="card-tag-row"><span class="label">${UI.esc(c.label)}</span><span class="asset-tag">${tag}</span></div>
+        <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span></div>
         <div class="value"><span class="count" data-count="${val}">${UI.fmt(val)}</span>${c.unit ? ' <span class="unit">'+c.unit+'</span>' : ''}</div>
         <div class="sub">${UI.esc(c.sub(r.data))}</div></div>`;
     }).join('');
@@ -373,7 +410,7 @@ const PageDashboard = () => {
     }).join('');
     box.innerHTML = `<section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
       <div class="panel-head">
-        <div class="label-row"><span class="asset-tag">${type.tag}</span><div><h3>${UI.esc(type.name)} — дэлгэрэнгүй</h3>
+        <div class="label-row"><span class="mchip" style="background:${type.color}">${type.icon}</span><div><h3>${UI.esc(type.name)} — дэлгэрэнгүй</h3>
         <p>Илгээсэн: ${UI.esc(r.submitted_by_name || '')} · ${UI.esc((r.updated_at||'').replace('T',' ').slice(0,16))}</p></div></div>
         <button class="btn btn-soft" id="closeDetail">Хаах</button>
       </div>
@@ -443,7 +480,8 @@ const PageReport = () => {
     return;
   }
   pickerBox.innerHTML = allowed.map((t,i) => `<button class="permission-card ${i===0?'active':''}" data-key="${t.key}">
-    <span class="ptag">${t.tag}</span><span class="pname">${UI.esc(t.name)}</span><small>${UI.esc(t.desc)}</small>
+    <span style="display:flex;align-items:center;gap:8px;margin-bottom:7px"><span class="mchip" style="background:${t.color}">${t.icon}</span><span class="ptag">${t.tag}</span></span>
+    <span class="pname">${UI.esc(t.name)}</span><small>${UI.esc(t.desc)}</small>
   </button>`).join('');
   UI.$$('.permission-card', pickerBox).forEach(btn => btn.onclick = () => selectReport(btn.dataset.key));
 
@@ -455,7 +493,10 @@ const PageReport = () => {
     UI.$$('.permission-card').forEach(b => b.classList.toggle('active', b.dataset.key === key));
     const type = CONFIG.reportTypes.find(t => t.key === key);
     UI.$('#formPanel').classList.remove('hidden');
-    UI.$('#formTag').textContent = type.tag;
+    const tagEl = UI.$('#formTag');
+    tagEl.className = 'mchip';
+    tagEl.style.background = type.color;
+    tagEl.innerHTML = type.icon;
     UI.$('#formTitle').textContent = type.name;
     UI.$('#formDesc').textContent = type.desc;
     UI.alertBox(UI.$('#submitMessage'), '');
