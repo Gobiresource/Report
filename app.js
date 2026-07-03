@@ -39,6 +39,24 @@ const CONFIG = (() => {
     {key:'issue',      tag:'ISU', name:'Асуудал',           desc:'Үйлдвэрийн үйл ажиллагаанд тулгарсан асуудал', color:'var(--c-issue)', icon:I.alert}
   ];
 
+  // Машины зориулалт ба өмчлөлийн нэршил
+  const purposeLabels = {sludge:'Шлам', waste:'Хаягдал', short:'Богино рейс', product:'Бүтээгдэхүүн', support:'Туслах'};
+  const ownershipLabels = {own:'Өөрийн', rental_product:'Бүт. түрээс', rental_sludge:'Шлам түрээс'};
+  const ownershipColors = {own:'var(--c-camp)', rental_product:'var(--c-transport)', rental_sludge:'var(--c-fuel)'};
+
+  /** Тээврийн машин-мөрүүдээс зориулалтаар нь нийлбэр гаргана (KPI-тай нийцүүлэх) */
+  function transportTotals(rows){
+    const t = {sludge_trips:0,sludge_ton:0,waste_trips:0,waste_ton:0,short_waste_trips:0,short_waste_ton:0,product_transport_trips:0,product_transport_ton:0};
+    (rows||[]).forEach(r => {
+      const trips = num(r.trips), ton = num(r.ton);
+      if(r.purpose === 'sludge'){ t.sludge_trips += trips; t.sludge_ton += ton; }
+      else if(r.purpose === 'waste'){ t.waste_trips += trips; t.waste_ton += ton; }
+      else if(r.purpose === 'short'){ t.short_waste_trips += trips; t.short_waste_ton += ton; }
+      else if(r.purpose === 'product'){ t.product_transport_trips += trips; t.product_transport_ton += ton; }
+    });
+    return t;
+  }
+
   const forms = {
     production: [
       {name:'shift_day_product_ton',   label:'Өдрийн ээлжийн бүтээгдэхүүн / тн', type:'number'},
@@ -54,28 +72,13 @@ const CONFIG = (() => {
       {name:'note', label:'Тайлбар', type:'textarea', full:true}
     ],
     transport: [
-      {name:'sludge_trips', label:'Шлам рейс', type:'number'},
-      {name:'sludge_ton',   label:'Шлам тонн', type:'number'},
-      {name:'waste_trips',  label:'Хаягдал рейс', type:'number'},
-      {name:'waste_ton',    label:'Хаягдал тонн', type:'number'},
-      {name:'short_waste_trips', label:'Богино дотор рейс', type:'number'},
-      {name:'short_waste_ton',   label:'Богино дотор рейс тонн', type:'number'},
-      {name:'product_transport_trips', label:'Бүтээгдэхүүн тээвэр рейс', type:'number'},
-      {name:'product_transport_ton',   label:'Бүтээгдэхүүн тээвэр тонн', type:'number'},
       {name:'weighbridge_net_ton', label:'Пүүний бодит цэвэр жин / тн', type:'number'},
       {name:'weighbridge_trips',   label:'Пүүний рейс', type:'number'},
       {name:'note', label:'Тайлбар', type:'textarea', full:true}
     ],
     fuel: [
-      {name:'fuel_truck_income_liter',  label:'Түлшний машин орлого / л', type:'number'},
-      {name:'fuel_truck_opening_liter', label:'Түлшний машин эхний үлдэгдэл / л', type:'number'},
-      {name:'fuel_truck_machine_liter', label:'Машинд олгосон / л', type:'number'},
-      {name:'fuel_truck_plant_liter',   label:'Үйлдвэрт олгосон / л', type:'number'},
-      {name:'fuel_truck_closing_liter', label:'Түлшний машин үлдэгдэл / л', type:'number'},
-      {name:'reserve_tank_opening_liter', label:'Нөөцийн сав эхний үлдэгдэл / л', type:'number'},
-      {name:'reserve_tank_expense_liter', label:'Нөөцийн сав зарлага / л', type:'number'},
-      {name:'reserve_tank_closing_liter', label:'Нөөцийн сав үлдэгдэл / л', type:'number'},
-      {name:'fuel_issue_total_liter', label:'Түлш олголтын нийт / л', type:'number'},
+      {name:'fuel_opening_liter', label:'Эхний үлдэгдэл / л (өмнөх өдрөөс автоматаар)', type:'number'},
+      {name:'fuel_income_liter',  label:'Орлого / л (татан авалт)', type:'number'},
       {name:'note', label:'Тайлбар', type:'textarea', full:true}
     ],
     equipment: [
@@ -129,8 +132,21 @@ const CONFIG = (() => {
     },
     {
       key:'fuel', label:'Түлшний зарлага', unit:'л',
-      calc: d => num(d.fuel_truck_machine_liter) + num(d.fuel_truck_plant_liter) + num(d.reserve_tank_expense_liter),
-      sub: d => `Үлдэгдэл ${num(d.fuel_truck_closing_liter)+num(d.reserve_tank_closing_liter)} л`
+      calc: d => d.fuel_expense_liter !== undefined && d.fuel_expense_liter !== null
+        ? num(d.fuel_expense_liter)
+        : num(d.fuel_truck_machine_liter) + num(d.fuel_truck_plant_liter) + num(d.reserve_tank_expense_liter),
+      sub: d => {
+        const closing = (d.fuel_closing_liter !== undefined && d.fuel_closing_liter !== null)
+          ? num(d.fuel_closing_liter)
+          : num(d.fuel_truck_closing_liter) + num(d.reserve_tank_closing_liter);
+        return closing < 0 ? `⚠ Үлдэгдэл ${closing} л — СӨРӨГ` : `Үлдэгдэл ${closing} л`;
+      },
+      warnIf: d => {
+        const closing = (d.fuel_closing_liter !== undefined && d.fuel_closing_liter !== null)
+          ? num(d.fuel_closing_liter)
+          : num(d.fuel_truck_closing_liter) + num(d.reserve_tank_closing_liter);
+        return closing < 0;
+      }
     },
     {
       key:'equipment', label:'Ажилласан техник', unit:'',
@@ -156,7 +172,7 @@ const CONFIG = (() => {
     }
   ];
 
-  return {reportTypes, forms, summaryCards, num};
+  return {reportTypes, forms, summaryCards, num, purposeLabels, ownershipLabels, ownershipColors, transportTotals};
 })();
 
 /* ================================================================
@@ -197,7 +213,10 @@ const API = (() => {
     login: (username, pin) => call('/api/login', {username, pin}),
     submit: (payload) => call('/api/submit', withAuth(payload)),
     daily: (date) => call('/api/daily', withAuth({date})),
-    monthly: (month) => call('/api/monthly', withAuth({month}))
+    monthly: (month) => call('/api/monthly', withAuth({month})),
+    vehicles: () => call('/api/vehicles', withAuth({})),
+    vehicleSave: (vehicle) => call('/api/vehicles/save', withAuth({vehicle})),
+    vehicleRemove: (id) => call('/api/vehicles/remove', withAuth({id}))
   };
 })();
 
@@ -401,23 +420,111 @@ const PageDashboard = () => {
     const type = CONFIG.reportTypes.find(t => t.key === key);
     const box = UI.$('#moduleDetail');
     if(!r || !type){ box.innerHTML = ''; return; }
-    const fields = CONFIG.forms[key] || [];
-    const rows = fields.map(f => {
-      let v = r.data[f.name];
-      if(v === null || v === undefined || v === ''){ v = '—'; }
-      else if(f.type === 'select'){ const opt = (f.options||[]).find(o => o[0] === v); v = opt ? opt[1] : v; }
-      return `<tr><td>${UI.esc(f.label)}</td><td class="right">${UI.esc(v)}</td></tr>`;
-    }).join('');
+
+    let body;
+    if(key === 'fuel' && Array.isArray(r.data.vehicle_rows)){
+      body = fuelDetailHtml(r.data);
+    } else if(key === 'transport' && Array.isArray(r.data.vehicle_rows)){
+      body = transportDetailHtml(r.data);
+    } else {
+      const fields = CONFIG.forms[key] || [];
+      const rows = fields.map(f => {
+        let v = r.data[f.name];
+        if(v === null || v === undefined || v === ''){ v = '—'; }
+        else if(f.type === 'select'){ const opt = (f.options||[]).find(o => o[0] === v); v = opt ? opt[1] : v; }
+        return `<tr><td>${UI.esc(f.label)}</td><td class="right">${UI.esc(v)}</td></tr>`;
+      }).join('');
+      body = `<div class="table-wrap"><table class="table"><tbody>${rows}</tbody></table></div>`;
+    }
+
     box.innerHTML = `<section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
       <div class="panel-head">
         <div class="label-row"><span class="mchip" style="background:${type.color}">${type.icon}</span><div><h3>${UI.esc(type.name)} — дэлгэрэнгүй</h3>
         <p>Илгээсэн: ${UI.esc(r.submitted_by_name || '')} · ${UI.esc((r.updated_at||'').replace('T',' ').slice(0,16))}</p></div></div>
         <button class="btn btn-soft" id="closeDetail">Хаах</button>
-      </div>
-      <div class="table-wrap"><table class="table"><tbody>${rows}</tbody></table></div>
-    </section>`;
+      </div>${body}</section>`;
     UI.$('#closeDetail').onclick = () => { box.innerHTML = ''; };
     box.scrollIntoView({behavior:'smooth', block:'start'});
+  }
+
+  function ownBadge(ownership){
+    const label = CONFIG.ownershipLabels[ownership] || ownership || '—';
+    const color = CONFIG.ownershipColors[ownership] || 'var(--ink-3)';
+    return `<span class="own-badge" style="background:${color}">${UI.esc(label)}</span>`;
+  }
+
+  /** Түлшний дэлгэрэнгүй: баланс + машин бүрийн хэрэглээ, тээвэртэй холбож л/тонн */
+  function fuelDetailHtml(d){
+    const n = CONFIG.num;
+    const opening = n(d.fuel_opening_liter), income = n(d.fuel_income_liter);
+    const expense = n(d.fuel_expense_liter), closing = n(d.fuel_closing_liter);
+    const neg = closing < 0;
+
+    // Тухайн өдрийн тээврийн машин-мөрүүд (рейс/тонн)
+    const trn = dailyMap['transport'];
+    const trnByVid = {};
+    if(trn && Array.isArray(trn.data.vehicle_rows)){
+      trn.data.vehicle_rows.forEach(row => { trnByVid[row.vid] = row; });
+    }
+
+    const rows = (d.vehicle_rows || [])
+      .slice()
+      .sort((a,b) => n(b.liter) - n(a.liter))
+      .map(row => {
+        const t = trnByVid[row.vid];
+        const trips = t ? n(t.trips) : null;
+        const ton = t ? n(t.ton) : null;
+        const lpt = (ton && n(row.liter)) ? (n(row.liter)/ton) : null;
+        return `<tr>
+          <td>${UI.esc(row.name || '—')} ${ownBadge(row.ownership)}</td>
+          <td class="right">${UI.fmt(n(row.liter))}</td>
+          <td class="right">${row.moto ? UI.fmt(n(row.moto)) : '—'}</td>
+          <td class="right">${row.remain !== '' && row.remain != null ? UI.fmt(n(row.remain)) : '—'}</td>
+          <td class="right">${trips !== null ? UI.fmt(trips) : '—'}</td>
+          <td class="right">${ton !== null ? UI.fmt(ton) : '—'}</td>
+          <td class="right"><b>${lpt !== null ? lpt.toFixed(2) : '—'}</b></td>
+        </tr>`;
+      }).join('');
+
+    return `
+      <div class="fuel-calc detail-chips ${neg?'fuel-neg':''}">
+        <span>Эхний үлдэгдэл: <b>${UI.fmt(opening)} л</b></span>
+        <span>Орлого: <b>${UI.fmt(income)} л</b></span>
+        <span>Зарлага: <b>${UI.fmt(expense)} л</b></span>
+        <span>Үлдэгдэл: <b>${UI.fmt(closing)} л</b></span>
+        ${neg ? '<span class="fuel-warn-txt">⚠ Сөрөг үлдэгдэл</span>' : ''}
+      </div>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Машин</th><th>Олгосон / л</th><th>Мото цаг</th><th>Машинд үлдсэн / л</th><th>Рейс</th><th>Тонн</th><th>л/тонн</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="7" class="muted">Машины мөр байхгүй</td></tr>'}</tbody>
+      </table></div>
+      ${d.note ? `<p class="muted" style="margin:12px 2px 0;font-size:13px">Тайлбар: ${UI.esc(d.note)}</p>` : ''}`;
+  }
+
+  /** Тээврийн дэлгэрэнгүй: зориулалтын нийлбэр + машин бүрийн рейс/тонн */
+  function transportDetailHtml(d){
+    const n = CONFIG.num;
+    const rows = (d.vehicle_rows || [])
+      .slice()
+      .sort((a,b) => n(b.ton) - n(a.ton))
+      .map(row => `<tr>
+        <td>${UI.esc(row.name || '—')} ${ownBadge(row.ownership)}</td>
+        <td>${UI.esc(CONFIG.purposeLabels[row.purpose] || row.purpose || '—')}</td>
+        <td class="right">${UI.fmt(n(row.trips))}</td>
+        <td class="right">${UI.fmt(n(row.ton))}</td>
+      </tr>`).join('');
+    return `
+      <div class="fuel-calc detail-chips">
+        <span>Шлам: <b>${UI.fmt(n(d.sludge_ton))} тн / ${UI.fmt(n(d.sludge_trips))} рейс</b></span>
+        <span>Хаягдал: <b>${UI.fmt(n(d.waste_ton)+n(d.short_waste_ton))} тн</b></span>
+        <span>Бүтээгдэхүүн: <b>${UI.fmt(n(d.product_transport_ton))} тн / ${UI.fmt(n(d.product_transport_trips))} рейс</b></span>
+        <span>Пүү: <b>${UI.fmt(n(d.weighbridge_net_ton))} тн / ${UI.fmt(n(d.weighbridge_trips))} рейс</b></span>
+      </div>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Машин</th><th>Зориулалт</th><th>Рейс</th><th>Тонн</th></tr></thead>
+        <tbody>${rows || '<tr><td colspan="4" class="muted">Машины мөр байхгүй</td></tr>'}</tbody>
+      </table></div>
+      ${d.note ? `<p class="muted" style="margin:12px 2px 0;font-size:13px">Тайлбар: ${UI.esc(d.note)}</p>` : ''}`;
   }
 
   async function loadMonthly(month){
@@ -431,10 +538,12 @@ const PageDashboard = () => {
       const count = key => (byType[key]||[]).length;
       const openIssues = (byType['issue']||[]).filter(r => r.data.status === 'open').length;
 
+      const fuelIncome = (byType['fuel']||[]).reduce((a,r)=>a+CONFIG.num(r.data.fuel_income_liter!=null?r.data.fuel_income_liter:r.data.fuel_truck_income_liter),0);
       const cards = [
+        ['Түлшний орлого нийт', UI.fmt(fuelIncome)+' л', count('fuel')+' өдрийн тайлан'],
         ['Бүтээгдэхүүн нийт', UI.fmt(sum('production','shift_day_product_ton')+sum('production','shift_night_product_ton'))+' тн', count('production')+' өдрийн тайлан'],
         ['Тээвэр нийт', UI.fmt(sum('transport','sludge_ton')+sum('transport','waste_ton')+sum('transport','short_waste_ton')+sum('transport','product_transport_ton'))+' тн', count('transport')+' өдрийн тайлан'],
-        ['Түлшний зарлага нийт', UI.fmt(sum('fuel','fuel_truck_machine_liter')+sum('fuel','fuel_truck_plant_liter')+sum('fuel','reserve_tank_expense_liter'))+' л', count('fuel')+' өдрийн тайлан'],
+        ['Түлшний зарлага нийт', UI.fmt((byType['fuel']||[]).reduce((a,r)=>a+(r.data.fuel_expense_liter!=null?CONFIG.num(r.data.fuel_expense_liter):CONFIG.num(r.data.fuel_truck_machine_liter)+CONFIG.num(r.data.fuel_truck_plant_liter)+CONFIG.num(r.data.reserve_tank_expense_liter)),0))+' л', count('fuel')+' өдрийн тайлан'],
         ['ХАБ зөрчил / Эмнэлэг', UI.fmt(sum('hse','hse_violation_count'))+' / '+UI.fmt(sum('hse','medical_assistance_count')), count('hse')+' өдрийн тайлан'],
         ['Пүүний нийт жин', UI.fmt(sum('transport','weighbridge_net_ton'))+' тн', 'тээврийн тайлангаас'],
         ['Нээлттэй асуудал', String(openIssues), count('issue')+' бүртгэл']
@@ -442,9 +551,55 @@ const PageDashboard = () => {
       box.innerHTML = cards.map(c => `<div class="bezel card"><span class="tick-a"></span><span class="tick-b"></span>
         <div class="card-tag-row"><span class="label">${UI.esc(c[0])}</span></div>
         <div class="value">${UI.esc(c[1])}</div><div class="sub">${UI.esc(c[2])}</div></div>`).join('');
+
+      renderMonthlyMachines(byType);
     }catch(err){
       box.innerHTML = `<div class="module-empty">${UI.esc(err.message)}</div>`;
     }
+  }
+
+  /** Сарын машин тус бүрийн үр ашиг: түлш + тээврийг машинаар нэгтгэж л/тонн */
+  function renderMonthlyMachines(byType){
+    const box = UI.$('#monthlyMachines');
+    if(!box) return;
+    const n = CONFIG.num;
+    const agg = {}; // vid -> {name, ownership, liter, trips, ton}
+    const touch = row => {
+      const k = row.vid || row.name;
+      if(!k) return null;
+      if(!agg[k]) agg[k] = {name: row.name || '—', ownership: row.ownership || '', liter:0, trips:0, ton:0};
+      return agg[k];
+    };
+    (byType['fuel'] || []).forEach(r => (r.data.vehicle_rows || []).forEach(row => {
+      const a = touch(row); if(a) a.liter += n(row.liter);
+    }));
+    (byType['transport'] || []).forEach(r => (r.data.vehicle_rows || []).forEach(row => {
+      const a = touch(row); if(a){ a.trips += n(row.trips); a.ton += n(row.ton); }
+    }));
+
+    const list = Object.values(agg).filter(a => a.liter || a.ton || a.trips)
+      .sort((a,b) => b.liter - a.liter);
+    if(!list.length){ box.innerHTML = ''; return; }
+
+    const rows = list.map(a => {
+      const lpt = (a.ton && a.liter) ? (a.liter / a.ton) : null;
+      return `<tr>
+        <td>${UI.esc(a.name)} ${ownBadge(a.ownership)}</td>
+        <td class="right">${UI.fmt(a.liter)}</td>
+        <td class="right">${UI.fmt(a.trips)}</td>
+        <td class="right">${UI.fmt(a.ton)}</td>
+        <td class="right"><b>${lpt !== null ? lpt.toFixed(2) : '—'}</b></td>
+      </tr>`;
+    }).join('');
+
+    box.innerHTML = `<section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head"><div><h3>Машин тус бүрийн үр ашиг</h3>
+      <p>Сарын нийт түлш, тээвэрлэлт, 1 тонн тутамд зарцуулсан литр. Түлш ихээр хэрэглэсэн дарааллаар.</p></div></div>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Машин</th><th>Түлш / л</th><th>Рейс</th><th>Тонн</th><th>л/тонн</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table></div>
+    </section>`;
   }
 
   loadDaily(UI.today());
@@ -460,6 +615,16 @@ const PageReport = () => {
   if(!session){ location.href = 'index.html'; return; }
 
   UI.$('#reportDate').value = UI.today();
+
+  // Машины бүртгэлийг ачаалж, тээврийн эрхтэй хүнд удирдах хэсэг харуулна
+  loadVehicles().then(() => {
+    const canManage = session.role === 'admin' || (session.permissions || []).includes('transport');
+    if(canManage) renderVehicleManager();
+    // Registry ирсний дараа нээлттэй байгаа fuel/transport form-ын select-үүдийг сэргээнэ
+    const form = UI.$('#dynamicReportForm');
+    const key = form?.dataset.reportType;
+    if(key === 'fuel' || key === 'transport') selectReport(key);
+  });
 
   const roleKey = session.role;
   const dept = CONFIG.reportTypes.find(t => t.key === session.department);
@@ -504,9 +669,246 @@ const PageReport = () => {
     const fields = CONFIG.forms[key] || [];
     const form = UI.$('#dynamicReportForm');
     form.dataset.reportType = key;
-    form.innerHTML = fields.map(renderField).join('') +
-      `<div class="form-actions"><button type="reset" class="btn btn-soft">Цэвэрлэх</button><button type="submit" class="btn btn-primary">Илгээх</button></div>`;
+
+    if(key === 'fuel'){
+      buildFuelForm(form, fields);
+    } else if(key === 'transport'){
+      buildTransportForm(form, fields);
+    } else {
+      form.innerHTML = fields.map(renderField).join('') +
+        `<div class="form-actions"><button type="reset" class="btn btn-soft">Цэвэрлэх</button><button type="submit" class="btn btn-primary">Илгээх</button></div>`;
+    }
     form.onsubmit = submitReport;
+  }
+
+  /* ---------------- Машины бүртгэл (registry) ---------------- */
+  let VEHICLES = [];
+  async function loadVehicles(){
+    try{ VEHICLES = (await API.vehicles()).vehicles || []; }
+    catch(e){ VEHICLES = []; }
+  }
+  function vehicleById(id){ return VEHICLES.find(v => String(v.id) === String(id)); }
+  function vehicleOptions(selectedId, filter){
+    const groups = {};
+    VEHICLES.filter(v => !filter || filter(v)).forEach(v => {
+      const g = CONFIG.ownershipLabels[v.ownership] || v.ownership;
+      (groups[g] = groups[g] || []).push(v);
+    });
+    return '<option value="">— Машин сонгох —</option>' + Object.entries(groups).map(([g, vs]) =>
+      `<optgroup label="${UI.esc(g)}">` +
+      vs.map(v => `<option value="${v.id}" ${String(v.id)===String(selectedId)?'selected':''}>${UI.esc(v.name)}</option>`).join('') +
+      `</optgroup>`).join('');
+  }
+
+  /* ---------------- Түлшний тусгай form ---------------- */
+  function fuelRowHtml(row = {}){
+    return `<tr class="fuel-row">
+      <td><select class="f-eq">${vehicleOptions(row.vid)}</select></td>
+      <td><input class="f-liter" type="number" step="any" min="0" placeholder="0" value="${row.liter ?? ''}"></td>
+      <td><input class="f-moto" type="number" step="any" min="0" placeholder="—" value="${row.moto ?? ''}"></td>
+      <td><input class="f-remain" type="number" step="any" min="0" placeholder="—" value="${row.remain ?? ''}"></td>
+      <td class="right"><button type="button" class="btn btn-soft btn-icon f-del" title="Мөр устгах">✕</button></td>
+    </tr>`;
+  }
+
+  function buildFuelForm(form, fields){
+    form.innerHTML =
+      fields.filter(f => f.name !== 'note').map(renderField).join('') +
+      `<div class="full">
+        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);margin:0 0 6px">Машин тус бүрийн олголт</label>
+        <div class="table-wrap"><table class="table fuel-table">
+          <thead><tr><th style="width:38%">Машин</th><th>Олгосон / л</th><th>Мото цаг</th><th>Машинд үлдсэн / л</th><th></th></tr></thead>
+          <tbody id="fuelRows">${fuelRowHtml()}</tbody>
+        </table></div>
+        <button type="button" id="fuelAddRow" class="btn btn-soft" style="margin-top:10px">+ Машин нэмэх</button>
+      </div>
+      <div class="full fuel-summary" id="fuelSummary"></div>` +
+      fields.filter(f => f.name === 'note').map(renderField).join('') +
+      `<div class="form-actions"><button type="reset" class="btn btn-soft">Цэвэрлэх</button><button type="submit" class="btn btn-primary">Илгээх</button></div>`;
+
+    UI.$('#fuelAddRow').onclick = () => {
+      UI.$('#fuelRows').insertAdjacentHTML('beforeend', fuelRowHtml());
+      wireFuelRows(form);
+    };
+    form.addEventListener('input', () => updateFuelSummary(form));
+    form.addEventListener('reset', () => setTimeout(() => {
+      UI.$('#fuelRows').innerHTML = fuelRowHtml();
+      wireFuelRows(form);
+      updateFuelSummary(form);
+    }, 0));
+    wireFuelRows(form);
+    prefillFuelOpening(form);
+    updateFuelSummary(form);
+  }
+
+  function wireFuelRows(form){
+    UI.$$('.f-del', form).forEach(btn => btn.onclick = () => {
+      const rows = UI.$$('.fuel-row', form);
+      if(rows.length > 1) btn.closest('tr').remove();
+      else rows[0].querySelectorAll('input,select').forEach(el => el.value = '');
+      updateFuelSummary(form);
+    });
+  }
+
+  function collectFuelRows(form){
+    return UI.$$('.fuel-row', form).map(tr => {
+      const vid = tr.querySelector('.f-eq').value;
+      const v = vehicleById(vid);
+      return {
+        vid,
+        name: v ? v.name : '',
+        ownership: v ? v.ownership : '',
+        liter: tr.querySelector('.f-liter').value,
+        moto: tr.querySelector('.f-moto').value,
+        remain: tr.querySelector('.f-remain').value
+      };
+    }).filter(r => r.vid || r.liter);
+  }
+
+  function updateFuelSummary(form){
+    const box = UI.$('#fuelSummary', form);
+    if(!box) return;
+    const opening = parseFloat(form.querySelector('[name=fuel_opening_liter]')?.value) || 0;
+    const income  = parseFloat(form.querySelector('[name=fuel_income_liter]')?.value) || 0;
+    const expense = collectFuelRows(form).reduce((a,r) => a + (parseFloat(r.liter)||0), 0);
+    const closing = opening + income - expense;
+    const neg = closing < 0;
+    box.innerHTML = `<div class="fuel-calc ${neg?'fuel-neg':''}">
+      <span>Орлого: <b>${UI.fmt(income)} л</b></span>
+      <span>Зарлага: <b>${UI.fmt(expense)} л</b></span>
+      <span>Үлдэгдэл: <b>${UI.fmt(closing)} л</b></span>
+      ${neg ? '<span class="fuel-warn-txt">⚠ Сөрөг үлдэгдэл — орлого эсвэл олголтын тоо алдаатай байж магадгүй. Шалгаад илгээнэ үү.</span>' : ''}
+    </div>`;
+  }
+
+  /** Өмнөх өдрийн түлшний үлдэгдлийг автоматаар эхний үлдэгдэлд тавина */
+  async function prefillFuelOpening(form){
+    const input = form.querySelector('[name=fuel_opening_liter]');
+    if(!input || input.value) return;
+    try{
+      const d = new Date(UI.$('#reportDate').value || UI.today());
+      d.setDate(d.getDate() - 1);
+      const res = await API.daily(d.toISOString().slice(0,10));
+      const fuel = (res.reports || []).find(r => r.report_type === 'fuel');
+      if(fuel && fuel.data){
+        const prev = fuel.data.fuel_closing_liter ?? fuel.data.fuel_truck_closing_liter;
+        if(prev !== undefined && prev !== null && input.value === ''){
+          input.value = prev;
+          updateFuelSummary(form);
+        }
+      }
+    }catch(e){ /* өмнөх өдрийн тайлан байхгүй бол хоосон үлдээнэ */ }
+  }
+
+  /* ---------------- Тээврийн тусгай form ---------------- */
+  function transportRowHtml(row = {}){
+    return `<tr class="trn-row">
+      <td><select class="t-eq">${vehicleOptions(row.vid)}</select></td>
+      <td><input class="t-trips" type="number" step="1" min="0" placeholder="0" value="${row.trips ?? ''}"></td>
+      <td><input class="t-ton" type="number" step="any" min="0" placeholder="0" value="${row.ton ?? ''}"></td>
+      <td class="right"><button type="button" class="btn btn-soft btn-icon t-del" title="Мөр устгах">✕</button></td>
+    </tr>`;
+  }
+
+  function buildTransportForm(form, fields){
+    form.innerHTML =
+      `<div class="full">
+        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);margin:0 0 6px">Машин тус бүрийн тээвэрлэлт</label>
+        <div class="table-wrap"><table class="table fuel-table">
+          <thead><tr><th style="width:44%">Машин</th><th>Рейс</th><th>Тонн</th><th></th></tr></thead>
+          <tbody id="trnRows">${transportRowHtml()}</tbody>
+        </table></div>
+        <button type="button" id="trnAddRow" class="btn btn-soft" style="margin-top:10px">+ Машин нэмэх</button>
+      </div>
+      <div class="full fuel-summary" id="trnSummary"></div>` +
+      fields.map(renderField).join('') +
+      `<div class="form-actions"><button type="reset" class="btn btn-soft">Цэвэрлэх</button><button type="submit" class="btn btn-primary">Илгээх</button></div>`;
+
+    UI.$('#trnAddRow').onclick = () => {
+      UI.$('#trnRows').insertAdjacentHTML('beforeend', transportRowHtml());
+      wireTransportRows(form);
+    };
+    form.addEventListener('input', () => updateTransportSummary(form));
+    form.addEventListener('reset', () => setTimeout(() => {
+      UI.$('#trnRows').innerHTML = transportRowHtml();
+      wireTransportRows(form);
+      updateTransportSummary(form);
+    }, 0));
+    wireTransportRows(form);
+    updateTransportSummary(form);
+  }
+
+  function wireTransportRows(form){
+    UI.$$('.t-del', form).forEach(btn => btn.onclick = () => {
+      const rows = UI.$$('.trn-row', form);
+      if(rows.length > 1) btn.closest('tr').remove();
+      else rows[0].querySelectorAll('input,select').forEach(el => el.value = '');
+      updateTransportSummary(form);
+    });
+  }
+
+  function collectTransportRows(form){
+    return UI.$$('.trn-row', form).map(tr => {
+      const vid = tr.querySelector('.t-eq').value;
+      const v = vehicleById(vid);
+      return {
+        vid,
+        name: v ? v.name : '',
+        purpose: v ? v.purpose : '',
+        ownership: v ? v.ownership : '',
+        trips: tr.querySelector('.t-trips').value,
+        ton: tr.querySelector('.t-ton').value
+      };
+    }).filter(r => r.vid || r.trips || r.ton);
+  }
+
+  function updateTransportSummary(form){
+    const box = UI.$('#trnSummary', form);
+    if(!box) return;
+    const t = CONFIG.transportTotals(collectTransportRows(form));
+    box.innerHTML = `<div class="fuel-calc">
+      <span>Шлам: <b>${UI.fmt(t.sludge_ton)} тн / ${UI.fmt(t.sludge_trips)} рейс</b></span>
+      <span>Хаягдал: <b>${UI.fmt(t.waste_ton + t.short_waste_ton)} тн</b></span>
+      <span>Бүтээгдэхүүн: <b>${UI.fmt(t.product_transport_ton)} тн / ${UI.fmt(t.product_transport_trips)} рейс</b></span>
+    </div>`;
+  }
+
+  /* ---------------- Машин нэмэх / хасах хэсэг ---------------- */
+  function renderVehicleManager(){
+    const panel = UI.$('#vehiclePanel');
+    if(!panel) return;
+    panel.classList.remove('hidden');
+    const listBox = UI.$('#vehicleList');
+    listBox.innerHTML = `<div class="table-wrap"><table class="table">
+      <thead><tr><th>Машины дугаар / нэр</th><th>Зориулалт</th><th>Өмчлөл</th><th></th></tr></thead>
+      <tbody>` + VEHICLES.map(v => `<tr>
+        <td>${UI.esc(v.name)}</td>
+        <td>${UI.esc(CONFIG.purposeLabels[v.purpose] || v.purpose)}</td>
+        <td><span class="own-badge" style="background:${CONFIG.ownershipColors[v.ownership]||'var(--ink-3)'}">${UI.esc(CONFIG.ownershipLabels[v.ownership] || v.ownership)}</span></td>
+        <td class="right"><button type="button" class="btn btn-soft btn-icon v-del" data-id="${v.id}" title="Идэвхгүй болгох">✕</button></td>
+      </tr>`).join('') + `</tbody></table></div>`;
+
+    UI.$$('.v-del', listBox).forEach(btn => btn.onclick = async () => {
+      if(!confirm('Энэ машиныг бүртгэлээс хасах уу? (Түүх устахгүй, зөвхөн идэвхгүй болно)')) return;
+      try{
+        const res = await API.vehicleRemove(btn.dataset.id);
+        VEHICLES = res.vehicles || [];
+        renderVehicleManager();
+      }catch(err){ alert(err.message); }
+    });
+
+    const addForm = UI.$('#vehicleAddForm');
+    addForm.onsubmit = async e => {
+      e.preventDefault();
+      const name = UI.$('#vNewName').value.trim();
+      if(!name) return;
+      try{
+        const res = await API.vehicleSave({name, purpose: UI.$('#vNewPurpose').value, ownership: UI.$('#vNewOwnership').value});
+        VEHICLES = res.vehicles || [];
+        UI.$('#vNewName').value = '';
+        renderVehicleManager();
+      }catch(err){ alert(err.message); }
+    };
   }
 
   function renderField(f){
@@ -523,6 +925,25 @@ const PageReport = () => {
     const fd = new FormData(e.currentTarget);
     const data = {};
     for(const [k,v] of fd.entries()){ data[k] = (v === '') ? null : v; }
+
+    // Түлшний тайлан: машин тус бүрийн мөр + автомат орлого/зарлага/үлдэгдэл
+    if(e.currentTarget.dataset.reportType === 'fuel'){
+      const rows = collectFuelRows(e.currentTarget);
+      const opening = parseFloat(data.fuel_opening_liter) || 0;
+      const income  = parseFloat(data.fuel_income_liter) || 0;
+      const expense = rows.reduce((a,r) => a + (parseFloat(r.liter)||0), 0);
+      data.vehicle_rows = rows;
+      data.fuel_expense_liter = expense;
+      data.fuel_closing_liter = Math.round((opening + income - expense) * 100) / 100;
+    }
+
+    // Тээврийн тайлан: машин тус бүрийн мөр + зориулалтаар нь нийлбэр
+    if(e.currentTarget.dataset.reportType === 'transport'){
+      const rows = collectTransportRows(e.currentTarget);
+      data.vehicle_rows = rows;
+      Object.assign(data, CONFIG.transportTotals(rows));
+    }
+
     const submitBtn = UI.$('button[type=submit]', e.currentTarget);
     submitBtn.disabled = true;
     try{

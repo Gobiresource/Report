@@ -159,6 +159,52 @@ async function handleMonthly(db, body) {
   return ok({month: body.month, reports});
 }
 
+// Машины бүртгэл удирдах эрх: admin эсвэл тээврийн тайлан оруулах эрхтэй хүн
+async function canManageVehicles(db, user) {
+  if (!user || !user.active) return false;
+  if (user.role === 'admin') return true;
+  return await canSubmit(db, user, 'transport');
+}
+
+async function handleVehiclesList(db, body) {
+  const user = await findUser(db, body.username, body.pin);
+  if (!user || !user.active) return fail('Нэвтрэлт хүчингүй байна. Дахин нэвтэрнэ үү.', 401);
+  const rows = await db.prepare(
+    `SELECT id, name, purpose, ownership FROM vehicles WHERE active = 1 ORDER BY ownership, sort_order, id`
+  ).all();
+  return ok({vehicles: rows.results || []});
+}
+
+async function handleVehicleSave(db, body) {
+  const user = await findUser(db, body.username, body.pin);
+  if (!user || !user.active) return fail('Нэвтрэлт хүчингүй байна. Дахин нэвтэрнэ үү.', 401);
+  if (!(await canManageVehicles(db, user))) return fail('Машины бүртгэл өөрчлөх эрх байхгүй.', 403);
+  const v = body.vehicle || {};
+  const name = String(v.name || '').trim();
+  if (!name) return fail('Машины дугаар / нэр хоосон байна.');
+  const purpose = ['sludge','waste','short','product','support'].includes(v.purpose) ? v.purpose : 'support';
+  const ownership = ['own','rental_product','rental_sludge'].includes(v.ownership) ? v.ownership : 'own';
+  if (v.id) {
+    await db.prepare(`UPDATE vehicles SET name=?, purpose=?, ownership=? WHERE id=?`)
+      .bind(name, purpose, ownership, v.id).run();
+  } else {
+    await db.prepare(`INSERT INTO vehicles (name, purpose, ownership, active) VALUES (?, ?, ?, 1)`)
+      .bind(name, purpose, ownership).run();
+  }
+  await logAction(db, user.id, 'vehicle_save', name, {purpose, ownership, id: v.id || 'new'});
+  return await handleVehiclesList(db, body);
+}
+
+async function handleVehicleRemove(db, body) {
+  const user = await findUser(db, body.username, body.pin);
+  if (!user || !user.active) return fail('Нэвтрэлт хүчингүй байна. Дахин нэвтэрнэ үү.', 401);
+  if (!(await canManageVehicles(db, user))) return fail('Машины бүртгэл өөрчлөх эрх байхгүй.', 403);
+  if (!body.id) return fail('Машины ID байхгүй.');
+  await db.prepare(`UPDATE vehicles SET active = 0 WHERE id = ?`).bind(body.id).run();
+  await logAction(db, user.id, 'vehicle_remove', String(body.id), {});
+  return await handleVehiclesList(db, body);
+}
+
 /* ---------------------------------------------------------------
    Entry point
    --------------------------------------------------------------- */
@@ -175,6 +221,9 @@ export async function onRequest(context) {
     if (method === 'POST' && route === 'submit')   return await handleSubmit(env.DB, await readBody(request));
     if (method === 'POST' && route === 'daily')    return await handleDaily(env.DB, await readBody(request));
     if (method === 'POST' && route === 'monthly')  return await handleMonthly(env.DB, await readBody(request));
+    if (method === 'POST' && route === 'vehicles')        return await handleVehiclesList(env.DB, await readBody(request));
+    if (method === 'POST' && route === 'vehicles/save')   return await handleVehicleSave(env.DB, await readBody(request));
+    if (method === 'POST' && route === 'vehicles/remove') return await handleVehicleRemove(env.DB, await readBody(request));
     return fail('API endpoint олдсонгүй: ' + route, 404);
   } catch (err) {
     return fail(err.message || 'Серверийн алдаа гарлаа.', 500);
