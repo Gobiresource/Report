@@ -4,5 +4,5 @@ pages_build_output_dir = "."
 
 [[d1_databases]]
 binding = "DB"
-database_name = "govi_dashboard"
-database_id = "PASTE_D1_DATABASE_ID_HERE"
+database_name = "govi-dashboard"
+database_id = "226da33a-fe7b-4159-bde8-235b7cd5b071"
