@@ -215,7 +215,25 @@ const UI = (() => {
       btn.onclick = () => { SESSION.clear(); location.href = 'index.html'; };
     });
   }
-  return {esc, today, thisMonth, $, $$, fmt, alertBox, paintUserChrome};
+  /** KPI тоог 0-ээс зорилтот утга руу зөөлөн гүйлгэж тоолно (ease-out). */
+  function animateCounts(root){
+    if(!root) return;
+    if(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+    $$('.count[data-count]', root).forEach(el => {
+      const target = parseFloat(el.dataset.count);
+      if(isNaN(target) || target === 0) return;
+      const dur = 650, t0 = performance.now();
+      function tick(now){
+        const p = Math.min((now - t0) / dur, 1);
+        const eased = 1 - Math.pow(1 - p, 3);
+        el.textContent = fmt(target * eased);
+        if(p < 1) requestAnimationFrame(tick);
+        else el.textContent = fmt(target);
+      }
+      requestAnimationFrame(tick);
+    });
+  }
+  return {esc, today, thisMonth, $, $$, fmt, alertBox, paintUserChrome, animateCounts};
 })();
 
 /* ================================================================
@@ -335,9 +353,10 @@ const PageDashboard = () => {
       const warn = c.warnIf ? c.warnIf(r.data) : false;
       return `<div class="bezel card ${warn?'card-warn':''}"><span class="tick-a"></span><span class="tick-b"></span>
         <div class="card-tag-row"><span class="label">${UI.esc(c.label)}</span><span class="asset-tag">${tag}</span></div>
-        <div class="value">${UI.fmt(val)}${c.unit ? ' <span class="unit">'+c.unit+'</span>' : ''}</div>
+        <div class="value"><span class="count" data-count="${val}">${UI.fmt(val)}</span>${c.unit ? ' <span class="unit">'+c.unit+'</span>' : ''}</div>
         <div class="sub">${UI.esc(c.sub(r.data))}</div></div>`;
     }).join('');
+    UI.animateCounts(UI.$('#summaryCards'));
   }
 
   function renderModuleDetail(key){
