@@ -273,7 +273,53 @@ const UI = (() => {
     const d = new Date(iso + 'T00:00:00');
     return `${d.getFullYear()} оны ${MN_MONTHS[d.getMonth()]}ын ${d.getDate()}, ${MN_DAYS[d.getDay()]} гараг`;
   }
-  return {esc, today, thisMonth, $, $$, fmt, alertBox, paintUserChrome, animateCounts, formatDateMn};
+
+  /** SVG donut chart: segments = [{label, value, color}] */
+  function donutHtml(segments, centerTop, centerBottom){
+    const total = segments.reduce((a,s) => a + s.value, 0);
+    if(total <= 0) return '';
+    const R = 40, C = 2 * Math.PI * R;
+    let offset = 0;
+    const arcs = segments.filter(s => s.value > 0).map(s => {
+      const frac = s.value / total;
+      const dash = frac * C;
+      const el = `<circle cx="50" cy="50" r="${R}" fill="none" stroke="${s.color}" stroke-width="13"
+        stroke-dasharray="${dash.toFixed(2)} ${(C-dash).toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}"
+        stroke-linecap="butt"/>`;
+      offset += dash;
+      return el;
+    }).join('');
+    const legend = segments.map(s => {
+      const pct = total ? Math.round(s.value/total*100) : 0;
+      return `<div class="donut-leg"><span class="donut-dot" style="background:${s.color}"></span>
+        <span class="donut-leg-label">${esc(s.label)}</span>
+        <span class="donut-leg-val">${fmt(s.value)} <small>(${pct}%)</small></span></div>`;
+    }).join('');
+    return `<div class="donut-wrap">
+      <div class="donut-fig">
+        <svg viewBox="0 0 100 100" class="donut-svg"><g transform="rotate(-90 50 50)">${arcs}</g></svg>
+        <div class="donut-center"><b>${esc(centerTop)}</b><small>${esc(centerBottom||'')}</small></div>
+      </div>
+      <div class="donut-legend">${legend}</div>
+    </div>`;
+  }
+
+  /** Хэвтээ bar жагсаалт: items = [{label, badge, value, sub, color}], value-гийн max-аар хэмжээсжинэ */
+  function barListHtml(items, valueSuffix){
+    const max = Math.max(...items.map(i => i.value), 1);
+    return `<div class="bar-list">` + items.map(i => {
+      const w = Math.max((i.value / max) * 100, 2);
+      return `<div class="bar-row">
+        <div class="bar-row-head">
+          <span class="bar-label">${esc(i.label)} ${i.badge || ''}</span>
+          <span class="bar-val"><b>${fmt(i.value)}</b> ${valueSuffix || ''}${i.sub ? ' <small>· '+i.sub+'</small>' : ''}</span>
+        </div>
+        <div class="bar-track"><div class="bar-fill" style="width:${w.toFixed(1)}%;background:${i.color || 'var(--brand)'}"></div></div>
+      </div>`;
+    }).join('') + `</div>`;
+  }
+
+  return {esc, today, thisMonth, $, $$, fmt, alertBox, paintUserChrome, animateCounts, formatDateMn, donutHtml, barListHtml};
 })();
 
 /* ================================================================
@@ -482,10 +528,26 @@ const PageDashboard = () => {
       trn.data.vehicle_rows.forEach(row => { trnByVid[row.vid] = row; });
     }
 
-    const rows = (d.vehicle_rows || [])
-      .slice()
-      .sort((a,b) => n(b.liter) - n(a.liter))
-      .map(row => {
+    const sorted = (d.vehicle_rows || []).slice().sort((a,b) => n(b.liter) - n(a.liter));
+
+    // Машины зарцуулалтын bar chart (өмчлөлийн өнгөөр)
+    const barItems = sorted.filter(row => n(row.liter) > 0).map(row => {
+      const t = trnByVid[row.vid];
+      const ton = t ? n(t.ton) : 0;
+      const lpt = (ton && n(row.liter)) ? (n(row.liter)/ton).toFixed(2) + ' л/тн' : '';
+      return {
+        label: row.name || '—',
+        badge: ownBadge(row.ownership),
+        value: n(row.liter),
+        sub: lpt,
+        color: CONFIG.ownershipColors[row.ownership] || 'var(--brand)'
+      };
+    });
+    const barsBlock = barItems.length
+      ? `<div class="viz-block"><div class="viz-title">Түлш зарцуулалт — машинаар</div>${UI.barListHtml(barItems, 'л')}</div>`
+      : '';
+
+    const rows = sorted.map(row => {
         const t = trnByVid[row.vid];
         const trips = t ? n(t.trips) : null;
         const ton = t ? n(t.ton) : null;
@@ -509,6 +571,7 @@ const PageDashboard = () => {
         <span>Үлдэгдэл: <b>${UI.fmt(closing)} л</b></span>
         ${neg ? '<span class="fuel-warn-txt">⚠ Сөрөг үлдэгдэл</span>' : ''}
       </div>
+      ${barsBlock}
       <div class="table-wrap"><table class="table">
         <thead><tr><th>Машин</th><th>Олгосон / л</th><th>Мото цаг</th><th>Машинд үлдсэн / л</th><th>Рейс</th><th>Тонн</th><th>л/тонн</th></tr></thead>
         <tbody>${rows || '<tr><td colspan="7" class="muted">Машины мөр байхгүй</td></tr>'}</tbody>
@@ -516,9 +579,15 @@ const PageDashboard = () => {
       ${d.note ? `<p class="muted" style="margin:12px 2px 0;font-size:13px">Тайлбар: ${UI.esc(d.note)}</p>` : ''}`;
   }
 
-  /** Тээврийн дэлгэрэнгүй: зориулалтын нийлбэр + машин бүрийн рейс/тонн */
+  /** Тээврийн дэлгэрэнгүй: donut + зориулалтын нийлбэр + машин бүрийн рейс/тонн */
   function transportDetailHtml(d){
     const n = CONFIG.num;
+    const donut = UI.donutHtml([
+      {label:'Шлам', value:n(d.sludge_ton), color:'var(--c-fuel)'},
+      {label:'Хаягдал', value:n(d.waste_ton)+n(d.short_waste_ton), color:'var(--c-issue)'},
+      {label:'Бүтээгдэхүүн', value:n(d.product_transport_ton), color:'var(--c-transport)'}
+    ], UI.fmt(n(d.sludge_ton)+n(d.waste_ton)+n(d.short_waste_ton)+n(d.product_transport_ton)), 'нийт тн');
+    const donutBlock = donut ? `<div class="viz-block"><div class="viz-title">Тээврийн бүтэц — тонноор</div>${donut}</div>` : '';
     const rows = (d.vehicle_rows || [])
       .slice()
       .sort((a,b) => n(b.ton) - n(a.ton))
@@ -535,6 +604,7 @@ const PageDashboard = () => {
         <span>Бүтээгдэхүүн: <b>${UI.fmt(n(d.product_transport_ton))} тн / ${UI.fmt(n(d.product_transport_trips))} рейс</b></span>
         <span>Пүү: <b>${UI.fmt(n(d.weighbridge_net_ton))} тн / ${UI.fmt(n(d.weighbridge_trips))} рейс</b></span>
       </div>
+      ${donutBlock}
       <div class="table-wrap"><table class="table">
         <thead><tr><th>Машин</th><th>Зориулалт</th><th>Рейс</th><th>Тонн</th></tr></thead>
         <tbody>${rows || '<tr><td colspan="4" class="muted">Машины мөр байхгүй</td></tr>'}</tbody>
@@ -570,9 +640,10 @@ const PageDashboard = () => {
       // Бодит гүйцэтгэлийг хадгалж, төлөвлөгөөтэй харьцуулна
       const actual = {
         production_ton: sum('production','shift_day_product_ton') + sum('production','shift_night_product_ton'),
-        transport_ton: sum('transport','sludge_ton')+sum('transport','waste_ton')+sum('transport','short_waste_ton')+sum('transport','product_transport_ton'),
+        sludge_ton: sum('transport','sludge_ton'),
+        sludge_trips: sum('transport','sludge_trips'),
         product_transport_ton: sum('transport','product_transport_ton'),
-        weighbridge_ton: sum('transport','weighbridge_net_ton'),
+        product_transport_trips: sum('transport','product_transport_trips'),
         fuel_expense_liter: (byType['fuel']||[]).reduce((a,r)=>a+(r.data.fuel_expense_liter!=null?CONFIG.num(r.data.fuel_expense_liter):CONFIG.num(r.data.fuel_truck_machine_liter)+CONFIG.num(r.data.fuel_truck_plant_liter)+CONFIG.num(r.data.reserve_tank_expense_liter)),0)
       };
       renderPlanVsActual(month, actual);
@@ -582,12 +653,14 @@ const PageDashboard = () => {
     }
   }
 
-  // Төлөвлөгөөний үзүүлэлтүүд (админ оруулна, бүгд хардаг)
+  // Төлөвлөгөөний үзүүлэлтүүд — компанийн сарын төлөвлөгөөний бодит бүтцээр
+  // (Бүтээгдэхүүн үйлдвэрлэлт тн, Шлам олборлолт тн + рейс, Бүтээгдэхүүн тээвэр тн + рейс, Түлш л)
   const PLAN_METRICS = [
-    {key:'production_ton', label:'Үйлдвэрлэл', unit:'тн', higherBetter:true},
-    {key:'transport_ton', label:'Тээвэр нийт', unit:'тн', higherBetter:true},
-    {key:'product_transport_ton', label:'Бүтээгдэхүүн тээвэр', unit:'тн', higherBetter:true},
-    {key:'weighbridge_ton', label:'Пүүний жин', unit:'тн', higherBetter:true},
+    {key:'production_ton', label:'Бүтээгдэхүүн үйлдвэрлэлт', unit:'тн', higherBetter:true},
+    {key:'sludge_ton', label:'Шлам олборлолт / тээвэрлэлт', unit:'тн', higherBetter:true},
+    {key:'sludge_trips', label:'Шлам тээвэрлэлт', unit:'рейс', higherBetter:true},
+    {key:'product_transport_ton', label:'Бүтээгдэхүүн тээвэрлэлт', unit:'тн', higherBetter:true},
+    {key:'product_transport_trips', label:'Бүтээгдэхүүн тээвэрлэлт', unit:'рейс', higherBetter:true},
     {key:'fuel_expense_liter', label:'Түлшний зарлага', unit:'л', higherBetter:false}
   ];
   let currentPlan = {};
@@ -678,6 +751,25 @@ const PageDashboard = () => {
       .sort((a,b) => b.liter - a.liter);
     if(!list.length){ box.innerHTML = ''; return; }
 
+    // Bar chart: машин бүрийн түлш зарцуулалт (өмчлөлийн өнгөөр, л/тонн-той)
+    const barItems = list.filter(a => a.liter > 0).map(a => {
+      const lpt = (a.ton && a.liter) ? (a.liter/a.ton).toFixed(2) + ' л/тн' : '';
+      const parts = [];
+      if(a.trips) parts.push(UI.fmt(a.trips)+' рейс');
+      if(a.ton) parts.push(UI.fmt(a.ton)+' тн');
+      if(lpt) parts.push(lpt);
+      return {
+        label: a.name,
+        badge: ownBadge(a.ownership),
+        value: a.liter,
+        sub: parts.join(' · '),
+        color: CONFIG.ownershipColors[a.ownership] || 'var(--brand)'
+      };
+    });
+    const barsBlock = barItems.length
+      ? `<div class="viz-block"><div class="viz-title">Сарын түлш зарцуулалт — машинаар</div>${UI.barListHtml(barItems, 'л')}</div>`
+      : '';
+
     const rows = list.map(a => {
       const lpt = (a.ton && a.liter) ? (a.liter / a.ton) : null;
       return `<tr>
@@ -691,7 +783,8 @@ const PageDashboard = () => {
 
     box.innerHTML = `<section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
       <div class="panel-head"><div><h3>Машин тус бүрийн үр ашиг</h3>
-      <p>Сарын нийт түлш, тээвэрлэлт, 1 тонн тутамд зарцуулсан литр. Түлш ихээр хэрэглэсэн дарааллаар.</p></div></div>
+      <p>Сарын нийт түлш (шлам + бүтээгдэхүүн бүх тээвэр нэгтгэсэн), 1 тонн тутамд зарцуулсан литр.</p></div></div>
+      ${barsBlock}
       <div class="table-wrap"><table class="table">
         <thead><tr><th>Машин</th><th>Түлш / л</th><th>Рейс</th><th>Тонн</th><th>л/тонн</th></tr></thead>
         <tbody>${rows}</tbody>
