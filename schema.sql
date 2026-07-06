@@ -157,3 +157,10 @@ INSERT INTO vehicles (name, purpose, ownership, active, sort_order) VALUES
 ('HDU832 3499УЕХ', 'sludge', 'rental_sludge', 1, 34),
 ('HDU833 0100ММА', 'sludge', 'rental_sludge', 1, 35),
 ('01-27 гридер', 'support', 'rental_sludge', 1, 36);
+
+-- Сарын төлөвлөгөө
+CREATE TABLE IF NOT EXISTS monthly_plans (
+  month TEXT PRIMARY KEY,
+  plan_json TEXT NOT NULL,
+  updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+);

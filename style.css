@@ -467,3 +467,52 @@ button{cursor:pointer}
 .vehicle-add input{flex:2 1 220px}
 .vehicle-add select{flex:1 1 130px}
 .vehicle-add input:focus,.vehicle-add select:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+
+/* =========================================================================
+   МАШИН СОНГОХ 3 БАГАНА (Өөрийн / Бүт.түрээс / Шлам түрээс)
+   ========================================================================= */
+.block-label{display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);margin:0 0 10px}
+.own-cols{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.own-col{
+  background:rgba(255,255,255,.45);border:1px solid rgba(255,255,255,.7);
+  border-radius:var(--radius-md);padding:12px;box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
+}
+.own-col-head{display:flex;align-items:center;gap:7px;font-weight:700;font-size:13px;margin-bottom:10px;letter-spacing:-.01em}
+.own-col-head small{color:var(--ink-3);font-weight:600}
+.own-dot{width:9px;height:9px;border-radius:50%;flex-shrink:0;box-shadow:inset 0 1px 0 rgba(255,255,255,.4)}
+.mrow{display:grid;grid-template-columns:1fr 58px 58px;gap:6px;align-items:center;padding:4px 0}
+.mrow.fuel{grid-template-columns:1fr 52px 46px 52px}
+.mrow.head{padding:0 0 4px;font-size:10.5px;color:var(--ink-3);font-weight:600;text-transform:uppercase;letter-spacing:.02em}
+.mrow.head span:not(.mrow-name){text-align:center}
+.mrow-name{font-size:12.5px;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.mrow input{
+  width:100%;border-radius:7px;padding:6px 7px;font-size:12.5px;text-align:center;
+  background:rgba(255,255,255,.65);border:1px solid rgba(255,255,255,.85);color:var(--ink);
+}
+.mrow input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 2.5px var(--brand-soft)}
+@media(max-width:820px){
+  .own-cols{grid-template-columns:1fr}
+}
+
+/* =========================================================================
+   СAРЫН ТӨЛӨВЛӨГӨӨ — ГҮЙЦЭТГЭЛ
+   ========================================================================= */
+.plan-row{margin-bottom:14px}
+.plan-row:last-child{margin-bottom:0}
+.plan-row-head{display:flex;justify-content:space-between;align-items:baseline;gap:10px;margin-bottom:6px}
+.plan-name{font-size:13.5px;font-weight:600}
+.plan-nums{font-size:12.5px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.plan-nums b{font-size:13.5px;margin-left:4px}
+.plan-bar{height:9px;border-radius:999px;background:rgba(60,60,80,.1);overflow:hidden}
+.plan-bar-fill{height:100%;border-radius:999px;background:var(--ink-3);transition:width .8s cubic-bezier(.22,.8,.3,1)}
+.plan-bar-fill.plan-good{background:var(--green)}
+.plan-bar-fill.plan-mid{background:var(--c-transport)}
+.plan-bar-fill.plan-low{background:var(--warn)}
+b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{color:var(--warn)}
+.plan-edit-row{display:flex;align-items:center;justify-content:space-between;gap:14px;margin-bottom:10px}
+.plan-edit-row label{font-size:13.5px;font-weight:500;color:var(--ink-2)}
+.plan-edit-row input{
+  width:180px;border-radius:var(--radius-sm);padding:9px 12px;font-size:14px;
+  background:rgba(255,255,255,.6);border:1px solid rgba(255,255,255,.85);color:var(--ink);
+}
+.plan-edit-row input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}

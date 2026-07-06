@@ -205,6 +205,32 @@ async function handleVehicleRemove(db, body) {
   return await handleVehiclesList(db, body);
 }
 
+// ---------- Сарын төлөвлөгөө ----------
+async function handlePlanGet(db, body) {
+  const user = await findUser(db, body.username, body.pin);
+  if (!user || !user.active) return fail('Нэвтрэлт хүчингүй байна. Дахин нэвтэрнэ үү.', 401);
+  if (!body.month || !MONTH_RE.test(body.month)) return fail('Сар буруу байна (YYYY-MM).');
+  const row = await db.prepare(
+    `SELECT plan_json FROM monthly_plans WHERE month = ? LIMIT 1`
+  ).bind(body.month).first();
+  return ok({month: body.month, plan: row ? parseJsonColumn(row.plan_json) : {}});
+}
+
+async function handlePlanSave(db, body) {
+  const user = await findUser(db, body.username, body.pin);
+  if (!user || !user.active) return fail('Нэвтрэлт хүчингүй байна. Дахин нэвтэрнэ үү.', 401);
+  // Төлөвлөгөө оруулах эрх: admin
+  if (user.role !== 'admin') return fail('Сарын төлөвлөгөө зөвхөн админ оруулна.', 403);
+  if (!body.month || !MONTH_RE.test(body.month)) return fail('Сар буруу байна (YYYY-MM).');
+  const planJson = JSON.stringify(body.plan || {});
+  await db.prepare(
+    `INSERT INTO monthly_plans (month, plan_json, updated_at) VALUES (?, ?, datetime('now'))
+     ON CONFLICT(month) DO UPDATE SET plan_json = excluded.plan_json, updated_at = datetime('now')`
+  ).bind(body.month, planJson).run();
+  await logAction(db, user.id, 'plan_save', body.month, body.plan || {});
+  return ok({month: body.month, plan: body.plan || {}});
+}
+
 /* ---------------------------------------------------------------
    Entry point
    --------------------------------------------------------------- */
@@ -224,6 +250,8 @@ export async function onRequest(context) {
     if (method === 'POST' && route === 'vehicles')        return await handleVehiclesList(env.DB, await readBody(request));
     if (method === 'POST' && route === 'vehicles/save')   return await handleVehicleSave(env.DB, await readBody(request));
     if (method === 'POST' && route === 'vehicles/remove') return await handleVehicleRemove(env.DB, await readBody(request));
+    if (method === 'POST' && route === 'plan')       return await handlePlanGet(env.DB, await readBody(request));
+    if (method === 'POST' && route === 'plan/save')  return await handlePlanSave(env.DB, await readBody(request));
     return fail('API endpoint олдсонгүй: ' + route, 404);
   } catch (err) {
     return fail(err.message || 'Серверийн алдаа гарлаа.', 500);

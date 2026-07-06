@@ -216,7 +216,9 @@ const API = (() => {
     monthly: (month) => call('/api/monthly', withAuth({month})),
     vehicles: () => call('/api/vehicles', withAuth({})),
     vehicleSave: (vehicle) => call('/api/vehicles/save', withAuth({vehicle})),
-    vehicleRemove: (id) => call('/api/vehicles/remove', withAuth({id}))
+    vehicleRemove: (id) => call('/api/vehicles/remove', withAuth({id})),
+    plan: (month) => call('/api/plan', withAuth({month})),
+    planSave: (month, plan) => call('/api/plan/save', withAuth({month, plan}))
   };
 })();
 
@@ -263,7 +265,15 @@ const UI = (() => {
       requestAnimationFrame(tick);
     });
   }
-  return {esc, today, thisMonth, $, $$, fmt, alertBox, paintUserChrome, animateCounts};
+  const MN_MONTHS = ['1-р сар','2-р сар','3-р сар','4-р сар','5-р сар','6-р сар','7-р сар','8-р сар','9-р сар','10-р сар','11-р сар','12-р сар'];
+  const MN_DAYS = ['Ням','Даваа','Мягмар','Лхагва','Пүрэв','Баасан','Бямба'];
+  /** '2026-07-06' -> '2026 оны 7-р сарын 6, Даваа' */
+  function formatDateMn(iso){
+    if(!iso || !/^\d{4}-\d{2}-\d{2}$/.test(iso)) return '';
+    const d = new Date(iso + 'T00:00:00');
+    return `${d.getFullYear()} оны ${MN_MONTHS[d.getMonth()]}ын ${d.getDate()}, ${MN_DAYS[d.getDay()]} гараг`;
+  }
+  return {esc, today, thisMonth, $, $$, fmt, alertBox, paintUserChrome, animateCounts, formatDateMn};
 })();
 
 /* ================================================================
@@ -330,6 +340,9 @@ const PageDashboard = () => {
   async function loadDaily(date){
     const msg = UI.$('#dashboardMessage');
     UI.alertBox(msg, '');
+    // Hero-д тухайн өдрийн он/сар/өдрийг Монголоор бичнэ
+    const heroLine = UI.$('#heroDateLine');
+    if(heroLine) heroLine.textContent = UI.formatDateMn(date) + ' — хэлтэс бүрийн тайлангийн нэгтгэл.';
     UI.$('#statusRow').innerHTML = '';
     UI.$('#summaryCards').innerHTML = '<div class="module-empty">Ачаалж байна…</div>';
     UI.$('#moduleDetail').innerHTML = '';
@@ -376,11 +389,13 @@ const PageDashboard = () => {
       const chip = `<span class="mchip" style="background:${t.color}">${t.icon}</span>`;
       if(r){
         const time = (r.updated_at || '').slice(11,16);
+        const who = UI.esc(r.submitted_by_name || '');
+        const meta = time ? `Илгээсэн: ${time}${who ? ' · '+who : ''}` : who;
         return `<button class="status-dial lit" data-key="${t.key}">
           ${chip}
           <span class="dial-text">
             <span class="dial-name">${UI.esc(t.name)}</span>
-            <span class="dial-meta">${UI.esc(r.submitted_by_name || '')}${time ? ' · '+time : ''}</span>
+            <span class="dial-meta">${meta}</span>
           </span>
         </button>`;
       }
@@ -552,10 +567,92 @@ const PageDashboard = () => {
         <div class="card-tag-row"><span class="label">${UI.esc(c[0])}</span></div>
         <div class="value">${UI.esc(c[1])}</div><div class="sub">${UI.esc(c[2])}</div></div>`).join('');
 
+      // Бодит гүйцэтгэлийг хадгалж, төлөвлөгөөтэй харьцуулна
+      const actual = {
+        production_ton: sum('production','shift_day_product_ton') + sum('production','shift_night_product_ton'),
+        transport_ton: sum('transport','sludge_ton')+sum('transport','waste_ton')+sum('transport','short_waste_ton')+sum('transport','product_transport_ton'),
+        product_transport_ton: sum('transport','product_transport_ton'),
+        weighbridge_ton: sum('transport','weighbridge_net_ton'),
+        fuel_expense_liter: (byType['fuel']||[]).reduce((a,r)=>a+(r.data.fuel_expense_liter!=null?CONFIG.num(r.data.fuel_expense_liter):CONFIG.num(r.data.fuel_truck_machine_liter)+CONFIG.num(r.data.fuel_truck_plant_liter)+CONFIG.num(r.data.reserve_tank_expense_liter)),0)
+      };
+      renderPlanVsActual(month, actual);
       renderMonthlyMachines(byType);
     }catch(err){
       box.innerHTML = `<div class="module-empty">${UI.esc(err.message)}</div>`;
     }
+  }
+
+  // Төлөвлөгөөний үзүүлэлтүүд (админ оруулна, бүгд хардаг)
+  const PLAN_METRICS = [
+    {key:'production_ton', label:'Үйлдвэрлэл', unit:'тн', higherBetter:true},
+    {key:'transport_ton', label:'Тээвэр нийт', unit:'тн', higherBetter:true},
+    {key:'product_transport_ton', label:'Бүтээгдэхүүн тээвэр', unit:'тн', higherBetter:true},
+    {key:'weighbridge_ton', label:'Пүүний жин', unit:'тн', higherBetter:true},
+    {key:'fuel_expense_liter', label:'Түлшний зарлага', unit:'л', higherBetter:false}
+  ];
+  let currentPlan = {};
+  let currentActual = {};
+
+  async function renderPlanVsActual(month, actual){
+    currentActual = actual;
+    const box = UI.$('#planSection');
+    if(!box) return;
+    try{
+      const res = await API.plan(month);
+      currentPlan = res.plan || {};
+    }catch(e){ currentPlan = {}; }
+
+    const isAdmin = (SESSION.get() || {}).role === 'admin';
+    const rows = PLAN_METRICS.map(m => {
+      const plan = CONFIG.num(currentPlan[m.key]);
+      const act = CONFIG.num(actual[m.key]);
+      const hasPlan = plan > 0;
+      const pct = hasPlan ? Math.round((act / plan) * 100) : null;
+      // Түлш зарлага бол бага нь сайн — 100%-иас доош байвал ногоон
+      const good = pct === null ? '' : (m.higherBetter ? (pct >= 100 ? 'plan-good' : (pct >= 80 ? 'plan-mid' : 'plan-low'))
+                                                       : (pct <= 100 ? 'plan-good' : 'plan-low'));
+      const barPct = pct === null ? 0 : Math.min(pct, 100);
+      return `<div class="plan-row">
+        <div class="plan-row-head">
+          <span class="plan-name">${UI.esc(m.label)}</span>
+          <span class="plan-nums">${UI.fmt(act)} / ${hasPlan ? UI.fmt(plan) : '—'} ${m.unit} ${pct!==null?`<b class="${good}">${pct}%</b>`:''}</span>
+        </div>
+        <div class="plan-bar"><div class="plan-bar-fill ${good}" style="width:${barPct}%"></div></div>
+      </div>`;
+    }).join('');
+
+    box.innerHTML = `<section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head">
+        <div><h3>Сарын төлөвлөгөө — гүйцэтгэл</h3><p>Тухайн сарын бодит дүнг төлөвлөгөөтэй харьцуулсан биелэлт.</p></div>
+        ${isAdmin ? '<button class="btn btn-soft" id="editPlanBtn">Төлөвлөгөө засах</button>' : ''}
+      </div>
+      <div id="planBody">${rows}</div>
+    </section>`;
+
+    if(isAdmin){
+      UI.$('#editPlanBtn').onclick = () => renderPlanEditor(month);
+    }
+  }
+
+  function renderPlanEditor(month){
+    const body = UI.$('#planBody');
+    if(!body) return;
+    body.innerHTML = PLAN_METRICS.map(m => `<div class="plan-edit-row">
+      <label>${UI.esc(m.label)} (${m.unit})</label>
+      <input type="number" step="any" min="0" data-key="${m.key}" value="${currentPlan[m.key] ?? ''}" placeholder="Төлөвлөгөө оруулах">
+    </div>`).join('') +
+    `<div class="form-actions"><button class="btn btn-soft" id="cancelPlanBtn">Болих</button><button class="btn btn-primary" id="savePlanBtn">Хадгалах</button></div>`;
+
+    UI.$('#cancelPlanBtn').onclick = () => renderPlanVsActual(month, currentActual);
+    UI.$('#savePlanBtn').onclick = async () => {
+      const plan = {};
+      UI.$$('[data-key]', body).forEach(inp => { if(inp.value !== '') plan[inp.dataset.key] = parseFloat(inp.value); });
+      try{
+        await API.planSave(month, plan);
+        currentPlan = plan;
+        renderPlanVsActual(month, currentActual);
+      }catch(err){ alert(err.message); }
+    };
   }
 
   /** Сарын машин тус бүрийн үр ашиг: түлш + тээврийг машинаар нэгтгэж л/тонн */
@@ -616,16 +713,6 @@ const PageReport = () => {
 
   UI.$('#reportDate').value = UI.today();
 
-  // Машины бүртгэлийг ачаалж, тээврийн эрхтэй хүнд удирдах хэсэг харуулна
-  loadVehicles().then(() => {
-    const canManage = session.role === 'admin' || (session.permissions || []).includes('transport');
-    if(canManage) renderVehicleManager();
-    // Registry ирсний дараа нээлттэй байгаа fuel/transport form-ын select-үүдийг сэргээнэ
-    const form = UI.$('#dynamicReportForm');
-    const key = form?.dataset.reportType;
-    if(key === 'fuel' || key === 'transport') selectReport(key);
-  });
-
   const roleKey = session.role;
   const dept = CONFIG.reportTypes.find(t => t.key === session.department);
   const confirmBox = UI.$('#accessConfirm');
@@ -653,6 +740,16 @@ const PageReport = () => {
   // Ганцхан эрхтэй бол сонголтын хэсгийг нуугаад шууд form руу
   if(allowed.length === 1){ UI.$('#reportPicker').classList.add('hidden'); }
   selectReport(allowed[0].key);
+
+  // Машины бүртгэлийг ачаална (тээвэр/түлш form-д хэрэгтэй). Ирсний дараа тухайн
+  // form-ыг дахин зурж, машинуудыг гаргана. selectReport энэ үед аль хэдийн бэлэн.
+  loadVehicles().then(() => {
+    const canManage = roleKey === 'admin' || (session.permissions || []).includes('transport');
+    if(canManage) renderVehicleManager();
+    const form = UI.$('#dynamicReportForm');
+    const key = form && form.dataset.reportType;
+    if(key === 'fuel' || key === 'transport') selectReport(key);
+  });
 
   function selectReport(key){
     UI.$$('.permission-card').forEach(b => b.classList.toggle('active', b.dataset.key === key));
@@ -700,69 +797,56 @@ const PageReport = () => {
       `</optgroup>`).join('');
   }
 
-  /* ---------------- Түлшний тусгай form ---------------- */
-  function fuelRowHtml(row = {}){
-    return `<tr class="fuel-row">
-      <td><select class="f-eq">${vehicleOptions(row.vid)}</select></td>
-      <td><input class="f-liter" type="number" step="any" min="0" placeholder="0" value="${row.liter ?? ''}"></td>
-      <td><input class="f-moto" type="number" step="any" min="0" placeholder="—" value="${row.moto ?? ''}"></td>
-      <td><input class="f-remain" type="number" step="any" min="0" placeholder="—" value="${row.remain ?? ''}"></td>
-      <td class="right"><button type="button" class="btn btn-soft btn-icon f-del" title="Мөр устгах">✕</button></td>
-    </tr>`;
-  }
-
+  /* ---------------- Түлшний тусгай form (3 баганаар) ---------------- */
   function buildFuelForm(form, fields){
+    if(!VEHICLES.length){
+      form.innerHTML = '<div class="module-empty">Машины бүртгэл ачаалж байна… Хэрэв удаж байвал хуудсаа сэргээнэ үү.</div>';
+      return;
+    }
+    const columns = OWNERSHIP_ORDER.map(o => {
+      const vs = VEHICLES.filter(v => v.ownership === o.key);
+      if(!vs.length) return '';
+      const rows = vs.map(v => `<div class="mrow fuel" data-vid="${v.id}">
+        <span class="mrow-name">${UI.esc(v.name)}</span>
+        <input class="f-liter" type="number" step="any" min="0" placeholder="олгосон л">
+        <input class="f-moto" type="number" step="any" min="0" placeholder="мото">
+        <input class="f-remain" type="number" step="any" min="0" placeholder="үлдсэн л">
+      </div>`).join('');
+      return `<div class="own-col">
+        <div class="own-col-head"><span class="own-dot" style="background:${o.color}"></span>${o.label} <small>(${vs.length})</small></div>
+        <div class="mrow fuel head"><span class="mrow-name"></span><span>Олгосон</span><span>Мото</span><span>Үлдсэн</span></div>
+        ${rows}
+      </div>`;
+    }).join('');
+
     form.innerHTML =
       fields.filter(f => f.name !== 'note').map(renderField).join('') +
       `<div class="full">
-        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);margin:0 0 6px">Машин тус бүрийн олголт</label>
-        <div class="table-wrap"><table class="table fuel-table">
-          <thead><tr><th style="width:38%">Машин</th><th>Олгосон / л</th><th>Мото цаг</th><th>Машинд үлдсэн / л</th><th></th></tr></thead>
-          <tbody id="fuelRows">${fuelRowHtml()}</tbody>
-        </table></div>
-        <button type="button" id="fuelAddRow" class="btn btn-soft" style="margin-top:10px">+ Машин нэмэх</button>
+        <label class="block-label">Машин тус бүрийн олголт (олгосон / мото цаг / машинд үлдсэн, литрээр)</label>
+        <div class="own-cols">${columns}</div>
       </div>
       <div class="full fuel-summary" id="fuelSummary"></div>` +
       fields.filter(f => f.name === 'note').map(renderField).join('') +
       `<div class="form-actions"><button type="reset" class="btn btn-soft">Цэвэрлэх</button><button type="submit" class="btn btn-primary">Илгээх</button></div>`;
 
-    UI.$('#fuelAddRow').onclick = () => {
-      UI.$('#fuelRows').insertAdjacentHTML('beforeend', fuelRowHtml());
-      wireFuelRows(form);
-    };
     form.addEventListener('input', () => updateFuelSummary(form));
-    form.addEventListener('reset', () => setTimeout(() => {
-      UI.$('#fuelRows').innerHTML = fuelRowHtml();
-      wireFuelRows(form);
-      updateFuelSummary(form);
-    }, 0));
-    wireFuelRows(form);
+    form.addEventListener('reset', () => setTimeout(() => updateFuelSummary(form), 0));
     prefillFuelOpening(form);
     updateFuelSummary(form);
   }
 
-  function wireFuelRows(form){
-    UI.$$('.f-del', form).forEach(btn => btn.onclick = () => {
-      const rows = UI.$$('.fuel-row', form);
-      if(rows.length > 1) btn.closest('tr').remove();
-      else rows[0].querySelectorAll('input,select').forEach(el => el.value = '');
-      updateFuelSummary(form);
-    });
-  }
-
   function collectFuelRows(form){
-    return UI.$$('.fuel-row', form).map(tr => {
-      const vid = tr.querySelector('.f-eq').value;
-      const v = vehicleById(vid);
+    return UI.$$('.own-col .mrow[data-vid]', form).map(row => {
+      const v = vehicleById(row.dataset.vid);
       return {
-        vid,
+        vid: row.dataset.vid,
         name: v ? v.name : '',
         ownership: v ? v.ownership : '',
-        liter: tr.querySelector('.f-liter').value,
-        moto: tr.querySelector('.f-moto').value,
-        remain: tr.querySelector('.f-remain').value
+        liter: row.querySelector('.f-liter').value,
+        moto: row.querySelector('.f-moto').value,
+        remain: row.querySelector('.f-remain').value
       };
-    }).filter(r => r.vid || r.liter);
+    }).filter(r => r.liter || r.moto || r.remain);
   }
 
   function updateFuelSummary(form){
@@ -800,66 +884,60 @@ const PageReport = () => {
     }catch(e){ /* өмнөх өдрийн тайлан байхгүй бол хоосон үлдээнэ */ }
   }
 
-  /* ---------------- Тээврийн тусгай form ---------------- */
-  function transportRowHtml(row = {}){
-    return `<tr class="trn-row">
-      <td><select class="t-eq">${vehicleOptions(row.vid)}</select></td>
-      <td><input class="t-trips" type="number" step="1" min="0" placeholder="0" value="${row.trips ?? ''}"></td>
-      <td><input class="t-ton" type="number" step="any" min="0" placeholder="0" value="${row.ton ?? ''}"></td>
-      <td class="right"><button type="button" class="btn btn-soft btn-icon t-del" title="Мөр устгах">✕</button></td>
-    </tr>`;
-  }
+  /* ---------------- Тээврийн тусгай form (3 баганаар) ---------------- */
+  const OWNERSHIP_ORDER = [
+    {key:'own', label:'Өөрийн', color:'var(--c-camp)'},
+    {key:'rental_product', label:'Бүтээгдэхүүн түрээс', color:'var(--c-transport)'},
+    {key:'rental_sludge', label:'Шлам түрээс', color:'var(--c-fuel)'}
+  ];
 
   function buildTransportForm(form, fields){
+    if(!VEHICLES.length){
+      form.innerHTML = '<div class="module-empty">Машины бүртгэл ачаалж байна… Хэрэв удаж байвал хуудсаа сэргээнэ үү.</div>';
+      return;
+    }
+    const columns = OWNERSHIP_ORDER.map(o => {
+      const vs = VEHICLES.filter(v => v.ownership === o.key);
+      if(!vs.length) return '';
+      const rows = vs.map(v => `<div class="mrow" data-vid="${v.id}">
+        <span class="mrow-name">${UI.esc(v.name)}</span>
+        <input class="t-trips" type="number" step="1" min="0" placeholder="рейс">
+        <input class="t-ton" type="number" step="any" min="0" placeholder="тонн">
+      </div>`).join('');
+      return `<div class="own-col">
+        <div class="own-col-head"><span class="own-dot" style="background:${o.color}"></span>${o.label} <small>(${vs.length})</small></div>
+        <div class="mrow head"><span class="mrow-name"></span><span>Рейс</span><span>Тонн</span></div>
+        ${rows}
+      </div>`;
+    }).join('');
+
     form.innerHTML =
       `<div class="full">
-        <label style="display:block;font-size:12.5px;font-weight:600;color:var(--ink-2);margin:0 0 6px">Машин тус бүрийн тээвэрлэлт</label>
-        <div class="table-wrap"><table class="table fuel-table">
-          <thead><tr><th style="width:44%">Машин</th><th>Рейс</th><th>Тонн</th><th></th></tr></thead>
-          <tbody id="trnRows">${transportRowHtml()}</tbody>
-        </table></div>
-        <button type="button" id="trnAddRow" class="btn btn-soft" style="margin-top:10px">+ Машин нэмэх</button>
+        <label class="block-label">Машин тус бүрийн тээвэрлэлт</label>
+        <div class="own-cols">${columns}</div>
       </div>
       <div class="full fuel-summary" id="trnSummary"></div>` +
       fields.map(renderField).join('') +
       `<div class="form-actions"><button type="reset" class="btn btn-soft">Цэвэрлэх</button><button type="submit" class="btn btn-primary">Илгээх</button></div>`;
 
-    UI.$('#trnAddRow').onclick = () => {
-      UI.$('#trnRows').insertAdjacentHTML('beforeend', transportRowHtml());
-      wireTransportRows(form);
-    };
     form.addEventListener('input', () => updateTransportSummary(form));
-    form.addEventListener('reset', () => setTimeout(() => {
-      UI.$('#trnRows').innerHTML = transportRowHtml();
-      wireTransportRows(form);
-      updateTransportSummary(form);
-    }, 0));
-    wireTransportRows(form);
+    form.addEventListener('reset', () => setTimeout(() => updateTransportSummary(form), 0));
     updateTransportSummary(form);
   }
 
-  function wireTransportRows(form){
-    UI.$$('.t-del', form).forEach(btn => btn.onclick = () => {
-      const rows = UI.$$('.trn-row', form);
-      if(rows.length > 1) btn.closest('tr').remove();
-      else rows[0].querySelectorAll('input,select').forEach(el => el.value = '');
-      updateTransportSummary(form);
-    });
-  }
-
   function collectTransportRows(form){
-    return UI.$$('.trn-row', form).map(tr => {
-      const vid = tr.querySelector('.t-eq').value;
-      const v = vehicleById(vid);
+    return UI.$$('.own-col .mrow[data-vid]', form).map(row => {
+      const v = vehicleById(row.dataset.vid);
+      const trips = row.querySelector('.t-trips').value;
+      const ton = row.querySelector('.t-ton').value;
       return {
-        vid,
+        vid: row.dataset.vid,
         name: v ? v.name : '',
         purpose: v ? v.purpose : '',
         ownership: v ? v.ownership : '',
-        trips: tr.querySelector('.t-trips').value,
-        ton: tr.querySelector('.t-ton').value
+        trips, ton
       };
-    }).filter(r => r.vid || r.trips || r.ton);
+    }).filter(r => r.trips || r.ton);
   }
 
   function updateTransportSummary(form){
@@ -920,15 +998,17 @@ const PageReport = () => {
 
   async function submitReport(e){
     e.preventDefault();
+    const formEl = e.currentTarget || e.target;
+    const reportType = formEl.dataset.reportType;
     const msg = UI.$('#submitMessage');
     UI.alertBox(msg, '');
-    const fd = new FormData(e.currentTarget);
+    const fd = new FormData(formEl);
     const data = {};
     for(const [k,v] of fd.entries()){ data[k] = (v === '') ? null : v; }
 
     // Түлшний тайлан: машин тус бүрийн мөр + автомат орлого/зарлага/үлдэгдэл
-    if(e.currentTarget.dataset.reportType === 'fuel'){
-      const rows = collectFuelRows(e.currentTarget);
+    if(reportType === 'fuel'){
+      const rows = collectFuelRows(formEl);
       const opening = parseFloat(data.fuel_opening_liter) || 0;
       const income  = parseFloat(data.fuel_income_liter) || 0;
       const expense = rows.reduce((a,r) => a + (parseFloat(r.liter)||0), 0);
@@ -938,28 +1018,30 @@ const PageReport = () => {
     }
 
     // Тээврийн тайлан: машин тус бүрийн мөр + зориулалтаар нь нийлбэр
-    if(e.currentTarget.dataset.reportType === 'transport'){
-      const rows = collectTransportRows(e.currentTarget);
+    if(reportType === 'transport'){
+      const rows = collectTransportRows(formEl);
       data.vehicle_rows = rows;
       Object.assign(data, CONFIG.transportTotals(rows));
     }
 
-    const submitBtn = UI.$('button[type=submit]', e.currentTarget);
-    submitBtn.disabled = true;
+    const submitBtn = UI.$('button[type=submit]', formEl);
+    if(submitBtn) submitBtn.disabled = true;
     try{
       await API.submit({
-        report_type: e.currentTarget.dataset.reportType,
+        report_type: reportType,
         date: UI.$('#reportDate').value || UI.today(),
         data
       });
       UI.alertBox(msg, 'Тайлан амжилттай хадгалагдлаа. Баярлалаа!', true);
-      e.currentTarget.reset();
+      // Form-ыг дахин зурснаар цэвэрлэнэ (reset() null-д унахгүй)
+      selectReport(reportType);
       window.scrollTo({top:0, behavior:'smooth'});
+      UI.alertBox(UI.$('#submitMessage'), 'Тайлан амжилттай хадгалагдлаа. Баярлалаа!', true);
     }catch(err){
       if(/нэвтрэлт хүчингүй/i.test(err.message)){ SESSION.clear(); location.href = 'index.html'; return; }
       UI.alertBox(msg, err.message);
     }finally{
-      submitBtn.disabled = false;
+      if(submitBtn) submitBtn.disabled = false;
     }
   }
 };
