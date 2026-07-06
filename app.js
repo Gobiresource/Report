@@ -121,14 +121,23 @@ const CONFIG = (() => {
   const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
   const summaryCards = [
     {
-      key:'production', label:'24 цагийн бүтээгдэхүүн', unit:'тн',
+      key:'production', label:'24 цагийн бүтээгдэхүүн', unit:'тн', featured:true,
       calc: d => num(d.shift_day_product_ton) + num(d.shift_night_product_ton),
-      sub: d => `Өдөр ${num(d.shift_day_product_ton)} + Шөнө ${num(d.shift_night_product_ton)}`
+      sub: d => `Өдөр ${num(d.shift_day_product_ton)} + Шөнө ${num(d.shift_night_product_ton)}`,
+      mini: d => [
+        {label:'Өдөр', value:num(d.shift_day_product_ton)},
+        {label:'Шөнө', value:num(d.shift_night_product_ton)}
+      ]
     },
     {
       key:'transport', label:'Тээвэрлэсэн нийт', unit:'тн',
       calc: d => num(d.sludge_ton) + num(d.waste_ton) + num(d.short_waste_ton) + num(d.product_transport_ton),
-      sub: d => `Шлам ${num(d.sludge_ton)} · Хаягдал ${num(d.waste_ton)+num(d.short_waste_ton)} · Бүт. ${num(d.product_transport_ton)}`
+      sub: d => `Шлам ${num(d.sludge_ton)} · Хаягдал ${num(d.waste_ton)+num(d.short_waste_ton)} · Бүт. ${num(d.product_transport_ton)}`,
+      mini: d => [
+        {label:'Шлам', value:num(d.sludge_ton), color:'var(--c-fuel)'},
+        {label:'Хаягдал', value:num(d.waste_ton)+num(d.short_waste_ton), color:'var(--c-issue)'},
+        {label:'Бүт.', value:num(d.product_transport_ton), color:'var(--c-transport)'}
+      ]
     },
     {
       key:'fuel', label:'Түлшний зарлага', unit:'л',
@@ -146,26 +155,47 @@ const CONFIG = (() => {
           ? num(d.fuel_closing_liter)
           : num(d.fuel_truck_closing_liter) + num(d.reserve_tank_closing_liter);
         return closing < 0;
+      },
+      lowerBetter:true,
+      mini: d => {
+        const closing = (d.fuel_closing_liter !== undefined && d.fuel_closing_liter !== null)
+          ? num(d.fuel_closing_liter)
+          : num(d.fuel_truck_closing_liter) + num(d.reserve_tank_closing_liter);
+        return [
+          {label:'Орлого', value:num(d.fuel_income_liter !== undefined ? d.fuel_income_liter : d.fuel_truck_income_liter), color:'var(--c-camp)'},
+          {label:'Зарлага', value:(d.fuel_expense_liter != null) ? num(d.fuel_expense_liter) : num(d.fuel_truck_machine_liter)+num(d.fuel_truck_plant_liter)+num(d.reserve_tank_expense_liter), color:'var(--c-transport)'},
+          {label:'Үлдэгдэл', value:Math.max(closing,0), color: closing < 0 ? 'var(--warn)' : 'var(--c-production)'}
+        ];
       }
     },
     {
       key:'equipment', label:'Ажилласан техник', unit:'',
       calc: d => num(d.main_working_count) + num(d.rental_sludge_working_count) + num(d.product_transport_working_count),
-      sub: d => `Засварт ${num(d.repair_count)} · Парк ${num(d.parked_count)}`
+      sub: d => `Засварт ${num(d.repair_count)} · Парк ${num(d.parked_count)}`,
+      mini: d => [
+        {label:'Ажилласан', value:num(d.main_working_count)+num(d.rental_sludge_working_count)+num(d.product_transport_working_count), color:'var(--c-camp)'},
+        {label:'Засварт', value:num(d.repair_count), color:'var(--warn)'},
+        {label:'Парк', value:num(d.parked_count), color:'var(--c-issue)'}
+      ]
     },
     {
       key:'camp', label:'Нийт хүн хүч', unit:'',
       calc: d => num(d.mongolian_count) + num(d.chinese_count) + num(d.guard_count) + num(d.contractor_count) + num(d.camp_staff_count),
-      sub: d => `Монгол ${num(d.mongolian_count)} · Хятад ${num(d.chinese_count)} · Зочин ${num(d.guest_count)}`
+      sub: d => `Монгол ${num(d.mongolian_count)} · Хятад ${num(d.chinese_count)} · Зочин ${num(d.guest_count)}`,
+      mini: d => [
+        {label:'Монгол', value:num(d.mongolian_count), color:'var(--c-production)'},
+        {label:'Хятад', value:num(d.chinese_count), color:'var(--c-hse)'},
+        {label:'Бусад', value:num(d.guard_count)+num(d.contractor_count)+num(d.camp_staff_count), color:'var(--c-issue)'}
+      ]
     },
     {
-      key:'hse', label:'ХАБ зөрчил / Эмнэлэг', unit:'',
+      key:'hse', label:'ХАБ зөрчил / Эмнэлэг', unit:'', lowerBetter:true,
       calc: d => num(d.hse_violation_count) + num(d.medical_assistance_count),
       sub: d => `Зөрчил ${num(d.hse_violation_count)} · Тусламж ${num(d.medical_assistance_count)}`,
       warnIf: d => (num(d.hse_violation_count) + num(d.medical_assistance_count)) > 0
     },
     {
-      key:'issue', label:'Асуудал', unit:'',
+      key:'issue', label:'Асуудал', unit:'', lowerBetter:true,
       calc: d => d.issue_text ? 1 : 0,
       sub: d => d.status === 'open' ? 'Нээлттэй асуудал байна' : (d.issue_text ? 'Шийдэгдсэн' : 'Бүртгэл алга'),
       warnIf: d => d.status === 'open'
@@ -366,6 +396,7 @@ const PageDashboard = () => {
   if(!session){ location.href = 'index.html'; return; }
 
   let dailyMap = {}; // report_type -> {data, submitted_by_name, updated_at}
+  let dailyPrevMap = {}; // өмнөх өдрийн тайлан — өсөлт/бууралтын хувь бодоход
 
   const dateInput = UI.$('#dashboardDate');
   const monthInput = UI.$('#dashboardMonth');
@@ -393,9 +424,17 @@ const PageDashboard = () => {
     UI.$('#summaryCards').innerHTML = '<div class="module-empty">Ачаалж байна…</div>';
     UI.$('#moduleDetail').innerHTML = '';
     try{
-      const res = await API.daily(date);
+      const prevD = new Date(date + 'T00:00:00');
+      prevD.setDate(prevD.getDate() - 1);
+      const prevIso = prevD.toISOString().slice(0,10);
+      const [res, prevRes] = await Promise.all([
+        API.daily(date),
+        API.daily(prevIso).catch(() => ({reports: []}))
+      ]);
       dailyMap = {};
       (res.reports || []).forEach(r => { dailyMap[r.report_type] = r; });
+      dailyPrevMap = {};
+      (prevRes.reports || []).forEach(r => { dailyPrevMap[r.report_type] = r; });
       renderStatusRow();
       renderSummaryCards();
     }catch(err){
@@ -461,16 +500,54 @@ const PageDashboard = () => {
       const r = dailyMap[c.key];
       const type = CONFIG.reportTypes.find(t => t.key === c.key) || {};
       const chip = `<span class="mchip" style="background:${type.color}">${type.icon || ''}</span>`;
+      const featured = c.featured ? 'card-featured' : '';
+
       if(!r){
-        return `<div class="bezel card card-missing"><span class="tick-a"></span><span class="tick-b"></span>
+        return `<div class="bezel card card-missing ${featured}"><span class="tick-a"></span><span class="tick-b"></span>
           <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span></div>
           <div class="value">—</div><div class="sub">Тайлан ороогүй</div></div>`;
       }
+
       const val = c.calc(r.data);
       const warn = c.warnIf ? c.warnIf(r.data) : false;
-      return `<div class="bezel card ${warn?'card-warn':''}"><span class="tick-a"></span><span class="tick-b"></span>
+
+      // Өмнөх өдрөөс өссөн/буурсан хувь (▲/▼ chip). Бага нь сайн үзүүлэлтэд өнгө урвуулна.
+      let trendChip = '';
+      const prev = dailyPrevMap[c.key];
+      if(prev){
+        const prevVal = c.calc(prev.data);
+        if(prevVal > 0){
+          const pct = Math.round(((val - prevVal) / prevVal) * 100);
+          if(pct !== 0){
+            const up = pct > 0;
+            const good = c.lowerBetter ? !up : up;
+            trendChip = `<span class="trend-chip ${good ? 'trend-good' : 'trend-bad'}">${up ? '▲' : '▼'} ${Math.abs(pct)}%<small>өчигдрөөс</small></span>`;
+          } else {
+            trendChip = `<span class="trend-chip trend-flat">— 0%<small>өчигдрөөс</small></span>`;
+          }
+        }
+      }
+
+      // Карт доторх мини bar график
+      let miniHtml = '';
+      if(c.mini){
+        const items = c.mini(r.data).filter(i => i.value > 0 || true);
+        const max = Math.max(...items.map(i => i.value), 1);
+        miniHtml = `<div class="mini-bars">` + items.map(i => {
+          const h = Math.max((i.value / max) * 100, 4);
+          return `<div class="mini-bar-col" title="${UI.esc(i.label)}: ${UI.fmt(i.value)}">
+            <span class="mini-bar-val">${UI.fmt(i.value)}</span>
+            <span class="mini-bar" style="height:${h.toFixed(0)}%;${i.color ? 'background:'+i.color : ''}"></span>
+            <span class="mini-bar-label">${UI.esc(i.label)}</span>
+          </div>`;
+        }).join('') + `</div>`;
+      }
+
+      return `<div class="bezel card ${warn?'card-warn':''} ${featured}"><span class="tick-a"></span><span class="tick-b"></span>
         <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span></div>
         <div class="value"><span class="count" data-count="${val}">${UI.fmt(val)}</span>${c.unit ? ' <span class="unit">'+c.unit+'</span>' : ''}</div>
+        ${trendChip}
+        ${miniHtml}
         <div class="sub">${UI.esc(c.sub(r.data))}</div></div>`;
     }).join('');
     UI.animateCounts(UI.$('#summaryCards'));

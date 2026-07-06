@@ -550,3 +550,50 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
 .bar-val small{color:var(--ink-3)}
 .bar-track{height:8px;border-radius:999px;background:rgba(60,60,80,.09);overflow:hidden}
 .bar-fill{height:100%;border-radius:999px;box-shadow:inset 0 1px 0 rgba(255,255,255,.35);transition:width .8s cubic-bezier(.22,.8,.3,1)}
+
+/* =========================================================================
+   SUMMARY КАРТЫН ШИНЭ ЗАГВАР — онцлох карт, trend chip, мини bar
+   ========================================================================= */
+
+/* Онцлох карт — Overall Revenue загвар: брэнд улаан gradient, цагаан текст */
+.card-featured{
+  background:linear-gradient(150deg,#D22833 0%,var(--brand) 50%,#8C161D 100%);
+  border-color:rgba(255,255,255,.32);
+  box-shadow:0 14px 36px rgba(188,32,41,.35), inset 0 1px 0 rgba(255,255,255,.4);
+  color:#fff;
+}
+.card-featured .label{color:rgba(255,255,255,.85)}
+.card-featured .value{color:#fff}
+.card-featured .value .unit{color:rgba(255,255,255,.75)}
+.card-featured .sub{color:rgba(255,255,255,.65)}
+.card-featured .mchip{box-shadow:inset 0 1px 0 rgba(255,255,255,.5), 0 3px 8px rgba(0,0,0,.25)}
+.card-featured:hover{box-shadow:0 20px 44px rgba(188,32,41,.45), inset 0 1px 0 rgba(255,255,255,.45)}
+.card-featured.card-missing{background:linear-gradient(150deg,rgba(210,40,51,.45),rgba(140,22,29,.45));color:#fff}
+.card-featured.card-missing .value,.card-featured.card-missing .sub{color:rgba(255,255,255,.7)}
+.card-featured .mini-bar{background:rgba(255,255,255,.85)!important}
+.card-featured .mini-bar-label,.card-featured .mini-bar-val{color:rgba(255,255,255,.8)}
+.card-featured .trend-chip{background:rgba(255,255,255,.22);color:#fff;border-color:rgba(255,255,255,.35)}
+.card-featured .trend-chip small{color:rgba(255,255,255,.7)}
+
+/* Өмнөх өдрөөс өссөн/буурсан chip */
+.trend-chip{
+  display:inline-flex;align-items:center;gap:5px;margin:2px 0 8px;
+  padding:3px 10px;border-radius:999px;font-size:11.5px;font-weight:700;
+  border:1px solid transparent;font-variant-numeric:tabular-nums;
+}
+.trend-chip small{font-weight:500;font-size:10px;opacity:.75}
+.trend-good{background:var(--green-soft);color:#1E7B3C;border-color:rgba(52,199,89,.3)}
+.trend-bad{background:var(--warn-soft);color:var(--warn);border-color:rgba(232,89,12,.3)}
+.trend-flat{background:rgba(60,60,80,.07);color:var(--ink-2)}
+
+/* Карт доторх мини bar график (лавлагааны 160/120/260 загвар) */
+.mini-bars{display:flex;gap:10px;align-items:flex-end;height:64px;margin:6px 0 10px;padding:0 2px}
+.mini-bar-col{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:flex-end;height:100%;gap:3px;min-width:0}
+.mini-bar{
+  width:100%;max-width:38px;border-radius:6px 6px 3px 3px;
+  background:var(--brand);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.4);
+  transition:height .7s cubic-bezier(.22,.8,.3,1);
+}
+.mini-bar-val{font-size:10px;font-weight:700;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
+.mini-bar-label{font-size:9.5px;color:var(--ink-3);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
