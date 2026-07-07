@@ -655,10 +655,10 @@ const PageDashboard = () => {
       const valueRow = c.vizReplacesValue && miniHtml
         ? ''
         : `<div class="value"><span class="count" data-count="${val}">${UI.fmt(val)}</span>${c.unit ? ' <span class="unit">'+c.unit+'</span>' : ''}</div>`;
-      return `<div class="bezel card ${warn?'card-warn':''} ${featured}"><span class="tick-a"></span><span class="tick-b"></span>
-        <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span></div>
+      const wide = (c.viz && miniHtml) ? 'card-wide' : '';
+      return `<div class="bezel card ${warn?'card-warn':''} ${featured} ${wide}"><span class="tick-a"></span><span class="tick-b"></span>
+        <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span>${trendChip}</div>
         ${valueRow}
-        ${trendChip}
         ${miniHtml}
         <div class="sub">${UI.esc(c.sub(r.data))}</div></div>`;
     }).join('');
