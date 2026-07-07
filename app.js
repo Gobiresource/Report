@@ -43,6 +43,11 @@ const CONFIG = (() => {
   const purposeLabels = {sludge:'Шлам', waste:'Хаягдал', short:'Богино рейс', product:'Бүтээгдэхүүн', support:'Туслах'};
   const ownershipLabels = {own:'Өөрийн', rental_product:'Бүт. түрээс', rental_sludge:'Шлам түрээс'};
   const ownershipColors = {own:'var(--c-camp)', rental_product:'var(--c-transport)', rental_sludge:'var(--c-fuel)'};
+  const OWNERSHIP_ORDER = [
+    {key:'own', label:'Өөрийн техник', color:'var(--c-camp)'},
+    {key:'rental_product', label:'Бүтээгдэхүүн тээврийн түрээс', color:'var(--c-transport)'},
+    {key:'rental_sludge', label:'Шлам тээврийн түрээс', color:'var(--c-fuel)'}
+  ];
 
   /** Тээврийн машин-мөрүүдээс зориулалтаар нь нийлбэр гаргана (KPI-тай нийцүүлэх) */
   function transportTotals(rows){
@@ -121,23 +126,35 @@ const CONFIG = (() => {
   const num = v => { const n = parseFloat(v); return isNaN(n) ? 0 : n; };
   const summaryCards = [
     {
-      key:'production', label:'24 цагийн бүтээгдэхүүн', unit:'тн', featured:true,
+      key:'production', label:'24 цагийн бүтээгдэхүүн', unit:'тн', featured:true, vizReplacesValue:true,
       calc: d => num(d.shift_day_product_ton) + num(d.shift_night_product_ton),
       sub: d => `Өдөр ${num(d.shift_day_product_ton)} + Шөнө ${num(d.shift_night_product_ton)}`,
       mini: d => [
         {label:'Өдөр', value:num(d.shift_day_product_ton)},
         {label:'Шөнө', value:num(d.shift_night_product_ton)}
-      ]
+      ],
+      viz: (d, ctx) => {
+        const val = num(d.shift_day_product_ton) + num(d.shift_night_product_ton);
+        const planMonth = ctx && ctx.plan ? num(ctx.plan.production_ton) : 0;
+        let target = null, label = 'тн баяжуулсан';
+        if(planMonth > 0 && ctx.date){
+          const dt = new Date(ctx.date + 'T00:00:00');
+          const days = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate();
+          target = planMonth / days;
+          label = 'тн · Төлөвлөгөө дундаж ' + UI.fmt(target) + ' тн/өдөр';
+        }
+        return UI.gaugeHtml(val, target, label);
+      }
     },
     {
-      key:'transport', label:'Тээвэрлэсэн нийт', unit:'тн',
+      key:'transport', label:'Тээвэр', unit:'тн', vizReplacesValue:true,
       calc: d => num(d.sludge_ton) + num(d.waste_ton) + num(d.short_waste_ton) + num(d.product_transport_ton),
       sub: d => `Шлам ${num(d.sludge_ton)} · Хаягдал ${num(d.waste_ton)+num(d.short_waste_ton)} · Бүт. ${num(d.product_transport_ton)}`,
-      mini: d => [
+      viz: d => UI.donutHtml([
         {label:'Шлам', value:num(d.sludge_ton), color:'var(--c-fuel)'},
         {label:'Хаягдал', value:num(d.waste_ton)+num(d.short_waste_ton), color:'var(--c-issue)'},
-        {label:'Бүт.', value:num(d.product_transport_ton), color:'var(--c-transport)'}
-      ]
+        {label:'Бүтээгдэхүүн', value:num(d.product_transport_ton), color:'var(--c-transport)'}
+      ], UI.fmt(num(d.sludge_ton)+num(d.waste_ton)+num(d.short_waste_ton)+num(d.product_transport_ton)), 'Нийт тн', {compact:true, badges:true})
     },
     {
       key:'fuel', label:'Түлшний зарлага', unit:'л',
@@ -202,7 +219,7 @@ const CONFIG = (() => {
     }
   ];
 
-  return {reportTypes, forms, summaryCards, num, purposeLabels, ownershipLabels, ownershipColors, transportTotals};
+  return {reportTypes, forms, summaryCards, num, purposeLabels, ownershipLabels, ownershipColors, OWNERSHIP_ORDER, transportTotals};
 })();
 
 /* ================================================================
@@ -265,6 +282,15 @@ const UI = (() => {
     if(n === null || n === undefined || isNaN(n)) return '—';
     return (Math.round(n*10)/10).toLocaleString('en-US', {maximumFractionDigits:1});
   }
+  /** Багтахгүй жижиг зайд тоог товчилно: 25048 -> 25k, 1500 -> 1.5k */
+  function fmtShort(n){
+    if(n === null || n === undefined || isNaN(n)) return '—';
+    const abs = Math.abs(n);
+    if(abs >= 1000000) return (n/1000000).toFixed(abs >= 10000000 ? 0 : 1).replace(/\.0$/,'') + 'сая';
+    if(abs >= 10000) return Math.round(n/1000) + 'k';
+    if(abs >= 1000) return (n/1000).toFixed(1).replace(/\.0$/,'') + 'k';
+    return fmt(n);
+  }
   function alertBox(el, text, ok=false){
     if(!el) return;
     el.innerHTML = text ? `<div class="alert ${ok?'alert-ok':'alert-error'}">${esc(text)}</div>` : '';
@@ -304,18 +330,27 @@ const UI = (() => {
     return `${d.getFullYear()} оны ${MN_MONTHS[d.getMonth()]}ын ${d.getDate()}, ${MN_DAYS[d.getDay()]} гараг`;
   }
 
-  /** SVG donut chart: segments = [{label, value, color}] */
-  function donutHtml(segments, centerTop, centerBottom){
+  /** SVG donut chart: segments = [{label, value, color}]; opts = {compact, badges} */
+  function donutHtml(segments, centerTop, centerBottom, opts = {}){
     const total = segments.reduce((a,s) => a + s.value, 0);
     if(total <= 0) return '';
     const R = 40, C = 2 * Math.PI * R;
     let offset = 0;
+    let badges = '';
     const arcs = segments.filter(s => s.value > 0).map(s => {
       const frac = s.value / total;
       const dash = frac * C;
       const el = `<circle cx="50" cy="50" r="${R}" fill="none" stroke="${s.color}" stroke-width="13"
         stroke-dasharray="${dash.toFixed(2)} ${(C-dash).toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}"
         stroke-linecap="butt"/>`;
+      // Сегментийн голд хувь заасан badge (лавлагааны 63/19/41 загвар)
+      if(opts.badges && frac >= 0.07){
+        const midFrac = (offset + dash/2) / C;
+        const ang = midFrac * 2 * Math.PI - Math.PI/2;
+        const bx = 50 + 47 * Math.cos(ang), by = 50 + 47 * Math.sin(ang);
+        badges += `<g><circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="9" fill="${s.color}" class="donut-badge-c"/>
+          <text x="${bx.toFixed(1)}" y="${by.toFixed(1)}" class="donut-badge-t" text-anchor="middle" dominant-baseline="central">${Math.round(frac*100)}%</text></g>`;
+      }
       offset += dash;
       return el;
     }).join('');
@@ -325,9 +360,9 @@ const UI = (() => {
         <span class="donut-leg-label">${esc(s.label)}</span>
         <span class="donut-leg-val">${fmt(s.value)} <small>(${pct}%)</small></span></div>`;
     }).join('');
-    return `<div class="donut-wrap">
+    return `<div class="donut-wrap ${opts.compact ? 'donut-compact' : ''}">
       <div class="donut-fig">
-        <svg viewBox="0 0 100 100" class="donut-svg"><g transform="rotate(-90 50 50)">${arcs}</g></svg>
+        <svg viewBox="-8 -8 116 116" class="donut-svg"><g transform="rotate(-90 50 50)">${arcs}</g>${badges}</svg>
         <div class="donut-center"><b>${esc(centerTop)}</b><small>${esc(centerBottom||'')}</small></div>
       </div>
       <div class="donut-legend">${legend}</div>
@@ -349,7 +384,74 @@ const UI = (() => {
     }).join('') + `</div>`;
   }
 
-  return {esc, today, thisMonth, $, $$, fmt, alertBox, paintUserChrome, animateCounts, formatDateMn, donutHtml, barListHtml};
+  /** Хагас дугуй gauge: зүү нь value-г заана, target (төлөвлөгөөний дундаж) тэмдэглэгдэнэ */
+  function gaugeHtml(value, target, centerLabel){
+    const max = Math.max(target ? target * 2 : 0, value * 1.15, 1);
+    const frac = Math.min(Math.max(value / max, 0), 1);
+    const tFrac = target ? Math.min(target / max, 1) : null;
+    const N = 29, cx = 100, cy = 96, r1 = 62, r2 = 86;
+    let ticks = '';
+    for(let i = 0; i < N; i++){
+      const f = i / (N - 1);
+      const a = Math.PI * (1 - f); // 180° -> 0°
+      const x1 = cx + r1 * Math.cos(a), y1 = cy - r1 * Math.sin(a);
+      const x2 = cx + r2 * Math.cos(a), y2 = cy - r2 * Math.sin(a);
+      const on = f <= frac;
+      const isTarget = tFrac !== null && Math.abs(f - tFrac) < (0.5 / (N - 1));
+      ticks += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
+        class="gauge-tick ${on ? 'on' : ''} ${isTarget ? 'target' : ''}"/>`;
+    }
+    const na = Math.PI * (1 - frac);
+    const nx = cx + 56 * Math.cos(na), ny = cy - 56 * Math.sin(na);
+    return `<div class="gauge-wrap">
+      <svg viewBox="0 0 200 104" class="gauge-svg">
+        ${ticks}
+        <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" class="gauge-needle"/>
+        <circle cx="${cx}" cy="${cy}" r="5" class="gauge-hub"/>
+      </svg>
+      <div class="gauge-center"><b class="count" data-count="${value}">${fmt(value)}</b><small>${esc(centerLabel || '')}</small></div>
+    </div>`;
+  }
+
+  /** Урсгал шугаман график: points = [{label, value}] — цэг бүрт тасархай шугам + нэр + тоо */
+  let waveId = 0;
+  function waveChartHtml(points, color){
+    if(!points.length) return '';
+    const stepX = 86, padL = 30, padR = 30, topPad = 40, H = 150, chartH = H - topPad - 16;
+    const W = padL + padR + Math.max((points.length - 1) * stepX, 40);
+    const maxV = Math.max(...points.map(p => p.value), 1);
+    const xy = points.map((p, i) => ({
+      x: padL + (points.length === 1 ? (W - padL - padR) / 2 : i * stepX),
+      y: topPad + chartH - (p.value / maxV) * chartH,
+      ...p
+    }));
+    // Зөөлөн муруй (cubic)
+    let path = `M ${xy[0].x} ${xy[0].y}`;
+    for(let i = 1; i < xy.length; i++){
+      const p0 = xy[i-1], p1 = xy[i];
+      const dx = (p1.x - p0.x) / 2;
+      path += ` C ${p0.x + dx} ${p0.y}, ${p1.x - dx} ${p1.y}, ${p1.x} ${p1.y}`;
+    }
+    const gid = 'wg' + (++waveId);
+    const guides = xy.map(p => `
+      <line x1="${p.x}" y1="${topPad - 6}" x2="${p.x}" y2="${H - 14}" class="wave-guide"/>
+      <text x="${p.x}" y="14" class="wave-label" text-anchor="middle">${esc(String(p.label).slice(0, 12))}</text>
+      <text x="${p.x}" y="30" class="wave-value" text-anchor="middle">${fmt(p.value)}</text>
+      <circle cx="${p.x}" cy="${p.y}" r="4" class="wave-dot" style="fill:${color}"/>`).join('');
+    return `<div class="wave-scroll"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="wave-svg">
+      <defs>
+        <linearGradient id="${gid}" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stop-color="${color}" stop-opacity=".25"/>
+          <stop offset="100%" stop-color="${color}" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      ${guides}
+      <path d="${path} L ${xy[xy.length-1].x} ${H-14} L ${xy[0].x} ${H-14} Z" fill="url(#${gid})"/>
+      <path d="${path}" fill="none" stroke="${color}" stroke-width="3" stroke-linecap="round" class="wave-line"/>
+    </svg></div>`;
+  }
+
+  return {esc, today, thisMonth, $, $$, fmt, fmtShort, alertBox, paintUserChrome, animateCounts, formatDateMn, donutHtml, barListHtml, gaugeHtml, waveChartHtml};
 })();
 
 /* ================================================================
@@ -397,6 +499,8 @@ const PageDashboard = () => {
 
   let dailyMap = {}; // report_type -> {data, submitted_by_name, updated_at}
   let dailyPrevMap = {}; // өмнөх өдрийн тайлан — өсөлт/бууралтын хувь бодоход
+  let dashPlan = {}; // тухайн сарын төлөвлөгөө (gauge-д хэрэгтэй)
+  let dashDate = UI.today();
 
   const dateInput = UI.$('#dashboardDate');
   const monthInput = UI.$('#dashboardMonth');
@@ -427,10 +531,13 @@ const PageDashboard = () => {
       const prevD = new Date(date + 'T00:00:00');
       prevD.setDate(prevD.getDate() - 1);
       const prevIso = prevD.toISOString().slice(0,10);
-      const [res, prevRes] = await Promise.all([
+      const [res, prevRes, planRes] = await Promise.all([
         API.daily(date),
-        API.daily(prevIso).catch(() => ({reports: []}))
+        API.daily(prevIso).catch(() => ({reports: []})),
+        API.plan(date.slice(0,7)).catch(() => ({plan: {}}))
       ]);
+      dashPlan = planRes.plan || {};
+      dashDate = date;
       dailyMap = {};
       (res.reports || []).forEach(r => { dailyMap[r.report_type] = r; });
       dailyPrevMap = {};
@@ -528,24 +635,29 @@ const PageDashboard = () => {
         }
       }
 
-      // Карт доторх мини bar график
+      // Карт доторх визуал: viz hook (gauge/donut) байвал түүнийг, үгүй бол мини bar
       let miniHtml = '';
-      if(c.mini){
+      if(c.viz){
+        miniHtml = c.viz(r.data, {plan: dashPlan, date: dashDate}) || '';
+      } else if(c.mini){
         const items = c.mini(r.data).filter(i => i.value > 0 || true);
         const max = Math.max(...items.map(i => i.value), 1);
         miniHtml = `<div class="mini-bars">` + items.map(i => {
           const h = Math.max((i.value / max) * 100, 4);
           return `<div class="mini-bar-col" title="${UI.esc(i.label)}: ${UI.fmt(i.value)}">
-            <span class="mini-bar-val">${UI.fmt(i.value)}</span>
+            <span class="mini-bar-val">${UI.fmtShort(i.value)}</span>
             <span class="mini-bar" style="height:${h.toFixed(0)}%;${i.color ? 'background:'+i.color : ''}"></span>
             <span class="mini-bar-label">${UI.esc(i.label)}</span>
           </div>`;
         }).join('') + `</div>`;
       }
 
+      const valueRow = c.vizReplacesValue && miniHtml
+        ? ''
+        : `<div class="value"><span class="count" data-count="${val}">${UI.fmt(val)}</span>${c.unit ? ' <span class="unit">'+c.unit+'</span>' : ''}</div>`;
       return `<div class="bezel card ${warn?'card-warn':''} ${featured}"><span class="tick-a"></span><span class="tick-b"></span>
         <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span></div>
-        <div class="value"><span class="count" data-count="${val}">${UI.fmt(val)}</span>${c.unit ? ' <span class="unit">'+c.unit+'</span>' : ''}</div>
+        ${valueRow}
         ${trendChip}
         ${miniHtml}
         <div class="sub">${UI.esc(c.sub(r.data))}</div></div>`;
@@ -828,24 +940,14 @@ const PageDashboard = () => {
       .sort((a,b) => b.liter - a.liter);
     if(!list.length){ box.innerHTML = ''; return; }
 
-    // Bar chart: машин бүрийн түлш зарцуулалт (өмчлөлийн өнгөөр, л/тонн-той)
-    const barItems = list.filter(a => a.liter > 0).map(a => {
-      const lpt = (a.ton && a.liter) ? (a.liter/a.ton).toFixed(2) + ' л/тн' : '';
-      const parts = [];
-      if(a.trips) parts.push(UI.fmt(a.trips)+' рейс');
-      if(a.ton) parts.push(UI.fmt(a.ton)+' тн');
-      if(lpt) parts.push(lpt);
-      return {
-        label: a.name,
-        badge: ownBadge(a.ownership),
-        value: a.liter,
-        sub: parts.join(' · '),
-        color: CONFIG.ownershipColors[a.ownership] || 'var(--brand)'
-      };
-    });
-    const barsBlock = barItems.length
-      ? `<div class="viz-block"><div class="viz-title">Сарын түлш зарцуулалт — машинаар</div>${UI.barListHtml(barItems, 'л')}</div>`
-      : '';
+    // Wave график: өмчлөлийн бүлэг тус бүрээр машин бүрийн түлш зарцуулалт
+    const waveBlocks = CONFIG.OWNERSHIP_ORDER.map(o => {
+      const points = list.filter(a => a.ownership === o.key && a.liter > 0)
+        .map(a => ({label: a.name, value: a.liter}));
+      if(!points.length) return '';
+      const color = o.color.startsWith('var') ? getComputedStyle(document.documentElement).getPropertyValue(o.color.slice(4,-1)).trim() || '#BC2029' : o.color;
+      return `<div class="viz-block"><div class="viz-title"><span class="own-dot" style="background:${o.color};display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px"></span>${UI.esc(o.label)} — түлш зарцуулалт / л</div>${UI.waveChartHtml(points, color)}</div>`;
+    }).join('');
 
     const rows = list.map(a => {
       const lpt = (a.ton && a.liter) ? (a.liter / a.ton) : null;
@@ -861,7 +963,7 @@ const PageDashboard = () => {
     box.innerHTML = `<section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
       <div class="panel-head"><div><h3>Машин тус бүрийн үр ашиг</h3>
       <p>Сарын нийт түлш (шлам + бүтээгдэхүүн бүх тээвэр нэгтгэсэн), 1 тонн тутамд зарцуулсан литр.</p></div></div>
-      ${barsBlock}
+      ${waveBlocks}
       <div class="table-wrap"><table class="table">
         <thead><tr><th>Машин</th><th>Түлш / л</th><th>Рейс</th><th>Тонн</th><th>л/тонн</th></tr></thead>
         <tbody>${rows}</tbody>
@@ -973,7 +1075,7 @@ const PageReport = () => {
       form.innerHTML = '<div class="module-empty">Машины бүртгэл ачаалж байна… Хэрэв удаж байвал хуудсаа сэргээнэ үү.</div>';
       return;
     }
-    const columns = OWNERSHIP_ORDER.map(o => {
+    const columns = CONFIG.OWNERSHIP_ORDER.map(o => {
       const vs = VEHICLES.filter(v => v.ownership === o.key);
       if(!vs.length) return '';
       const rows = vs.map(v => `<div class="mrow fuel" data-vid="${v.id}">
@@ -1055,18 +1157,13 @@ const PageReport = () => {
   }
 
   /* ---------------- Тээврийн тусгай form (3 баганаар) ---------------- */
-  const OWNERSHIP_ORDER = [
-    {key:'own', label:'Өөрийн', color:'var(--c-camp)'},
-    {key:'rental_product', label:'Бүтээгдэхүүн түрээс', color:'var(--c-transport)'},
-    {key:'rental_sludge', label:'Шлам түрээс', color:'var(--c-fuel)'}
-  ];
 
   function buildTransportForm(form, fields){
     if(!VEHICLES.length){
       form.innerHTML = '<div class="module-empty">Машины бүртгэл ачаалж байна… Хэрэв удаж байвал хуудсаа сэргээнэ үү.</div>';
       return;
     }
-    const columns = OWNERSHIP_ORDER.map(o => {
+    const columns = CONFIG.OWNERSHIP_ORDER.map(o => {
       const vs = VEHICLES.filter(v => v.ownership === o.key);
       if(!vs.length) return '';
       const rows = vs.map(v => `<div class="mrow" data-vid="${v.id}">

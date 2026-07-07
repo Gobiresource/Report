@@ -596,4 +596,65 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
   transition:height .7s cubic-bezier(.22,.8,.3,1);
 }
 .mini-bar-val{font-size:10px;font-weight:700;color:var(--ink-2);font-variant-numeric:tabular-nums;white-space:nowrap}
-.mini-bar-label{font-size:9.5px;color:var(--ink-3);font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%}
+.mini-bar-label{font-size:9.5px;color:var(--ink-3);font-weight:600;white-space:normal;text-align:center;line-height:1.15;max-width:100%;overflow-wrap:anywhere}
+
+/* =========================================================================
+   GAUGE — бүтээгдэхүүний гарц vs төлөвлөгөөний дундаж
+   ========================================================================= */
+.gauge-wrap{position:relative;margin:4px 0 6px}
+.gauge-svg{width:100%;max-width:230px;display:block;margin:0 auto}
+.gauge-tick{stroke:rgba(60,60,80,.18);stroke-width:4;stroke-linecap:round}
+.gauge-tick.on{stroke:var(--brand)}
+.gauge-tick.target{stroke:#FFB800;stroke-width:5}
+.gauge-needle{stroke:#1D1D1F;stroke-width:3.5;stroke-linecap:round}
+.gauge-hub{fill:#1D1D1F}
+.gauge-center{position:absolute;left:0;right:0;bottom:0;text-align:center;pointer-events:none}
+.gauge-center b{display:block;font-size:26px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
+.gauge-center small{display:block;font-size:9.5px;color:var(--ink-2);font-weight:600;margin-top:2px;padding:0 8px}
+/* Онцлох улаан карт дээрх gauge — цагаан хуваарь, алтан зүү */
+.card-featured .gauge-tick{stroke:rgba(255,255,255,.28)}
+.card-featured .gauge-tick.on{stroke:#fff}
+.card-featured .gauge-tick.target{stroke:#FFD60A}
+.card-featured .gauge-needle{stroke:#FFD60A}
+.card-featured .gauge-hub{fill:#FFD60A}
+.card-featured .gauge-center b{color:#fff}
+.card-featured .gauge-center small{color:rgba(255,255,255,.75)}
+
+/* =========================================================================
+   WAVE ГРАФИК — машин бүрийн түлш зарцуулалт
+   ========================================================================= */
+.wave-scroll{overflow-x:auto;padding-bottom:4px}
+.wave-svg{display:block}
+.wave-guide{stroke:rgba(60,60,80,.22);stroke-width:1;stroke-dasharray:3 4}
+.wave-label{font-size:10px;font-weight:600;fill:var(--ink-2)}
+.wave-value{font-size:11.5px;font-weight:800;fill:var(--ink);font-variant-numeric:tabular-nums}
+.wave-dot{stroke:#fff;stroke-width:2}
+.wave-line{filter:drop-shadow(0 2px 4px rgba(40,40,70,.2))}
+
+/* =========================================================================
+   DONUT — compact горим + сегментийн % badge
+   ========================================================================= */
+.donut-compact{gap:14px}
+.donut-compact .donut-fig{width:118px;height:118px}
+.donut-compact .donut-center b{font-size:16px}
+.donut-compact .donut-legend{min-width:0;gap:6px}
+.donut-compact .donut-leg{font-size:11.5px}
+.donut-badge-c{stroke:#fff;stroke-width:1.5}
+.donut-badge-t{font-size:7px;font-weight:800;fill:#fff}
+
+/* =========================================================================
+   БАГТААМЖИЙН ЗАСВАР — текст таслагдахгүй, картууд шахагдахгүй
+   ========================================================================= */
+/* Картууд шахагдахын оронд дараагийн мөрөнд бууна */
+.cards{grid-template-columns:repeat(auto-fit,minmax(250px,1fr))}
+.cards-3{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}
+/* Sub текст олон мөрөнд бүрэн эвхэгдэнэ, таслагдахгүй */
+.card .sub{white-space:normal;overflow-wrap:anywhere;word-break:break-word;line-height:1.45}
+/* Мини багануудын нэр/тоо — багтаах */
+.mini-bar-val{font-size:10px;white-space:nowrap}
+.mini-bar-label{font-size:9px;max-width:100%;white-space:normal;text-align:center;line-height:1.15}
+.mini-bars{gap:6px}
+/* Donut legend бүрэн эвхэгдэнэ */
+.donut-leg-label{overflow-wrap:anywhere;word-break:break-word}
+/* Bar жагсаалтын утга таслагдахгүй */
+.bar-val{white-space:normal;overflow-wrap:anywhere}
