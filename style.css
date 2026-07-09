@@ -734,3 +734,16 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
 .m-days span{flex:1;text-align:center;font-size:9px;color:#B0B6BC;font-weight:600;font-variant-numeric:tabular-nums;min-width:0;overflow:hidden}
 /* Олон өдөртэй үед баганын зай багасна */
 .m-cols.m-dense,.m-days.m-dense{gap:3px}
+
+/* Хэрэглэгчийн удирдлага — PIN солих (admin.html) */
+.btn-sm{padding:6px 13px;font-size:12.5px}
+.pin-edit{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.pin-input{
+  width:110px;border-radius:999px;padding:7px 13px;font-size:13.5px;
+  border:1px solid rgba(30,40,55,.12);background:#fff;
+  font-variant-numeric:tabular-nums;letter-spacing:.12em;
+}
+.pin-input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.pin-badge{font-size:11px;font-weight:700;border-radius:999px;padding:3px 10px;white-space:nowrap}
+.pin-on{background:rgba(52,199,89,.12);color:var(--green)}
+.pin-off{background:rgba(60,60,80,.08);color:var(--ink-3)}

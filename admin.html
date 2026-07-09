@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Admin — GRD</title>
+<title>Хэрэглэгчийн удирдлага — GRD</title>
 <link rel="icon" type="image/png" href="favicon.png">
 <link rel="stylesheet" href="style.css">
 </head>
@@ -11,40 +11,33 @@
   <header class="topbar">
     <div class="topbar-inner">
       <a class="nameplate" href="dashboard.html">
-        <span class="nameplate-mark" aria-hidden="true"><img src="logo.png" alt="" width="38" height="38" style="display:block;border-radius:9px"></span>        <span class="nameplate-text"><h1>Говь Ресурс Девелопмент</h1><p>Admin</p></span>
+        <span class="nameplate-mark" aria-hidden="true"><img src="logo.png" alt="" width="38" height="38" style="display:block;border-radius:9px"></span>        <span class="nameplate-text"><h1>Говь Ресурс Девелопмент</h1><p>Хэрэглэгчийн удирдлага</p></span>
       </a>
       <div class="top-actions">
         <a class="btn btn-soft" href="report.html">Тайлан</a>
         <a class="btn btn-soft" href="dashboard.html">Хяналтын самбар</a>
+        <span id="userPill" class="user-pill"></span>
+        <button id="logoutBtn" class="btn btn-soft hidden">Гарах</button>
       </div>
     </div>
   </header>
 
   <main class="main">
     <section class="bezel hero"><span class="tick-a"></span><span class="tick-b"></span>
-      <p class="eyebrow">Дараагийн шат</p>
+      <p class="eyebrow">Админ</p>
       <h2>Хэрэглэгчийн удирдлага</h2>
-      <p>Хэрэглэгч нэмэх, идэвхгүй болгох, PIN солих, тайлангийн эрх өөрчлөх боломж энд нэмэгдэнэ. Одоогоор эдгээр нь D1 Console-оор гараар удирдагдана.</p>
+      <p>Ажилтнуудын нэвтрэх PIN кодыг эндээс солино. PIN солигдмогц тухайн ажилтан шинэ кодоороо нэвтэрнэ.</p>
     </section>
 
+    <div id="adminMessage"></div>
+
     <section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
-      <div class="panel-head"><div><h3>Одоогийн хэрэглэгчид</h3><p>schema.sql-ийн seed мэдээлэл (D1 database дотор)</p></div></div>
-      <div class="table-wrap">
-        <table class="table">
-          <thead><tr><th>Нэвтрэх нэр</th><th>PIN</th><th>Эрх</th></tr></thead>
-          <tbody>
-            <tr><td>admin</td><td>9999</td><td>Удирдлага / бүх дашбоард</td></tr>
-            <tr><td>uildverlel</td><td>1111</td><td>Үйлдвэрлэл / Лаб</td></tr>
-            <tr><td>teever</td><td>2222</td><td>Тээвэр + пүүний мэдээлэл</td></tr>
-            <tr><td>tulsh</td><td>3333</td><td>Түлш</td></tr>
-            <tr><td>technik</td><td>4444</td><td>Техник</td></tr>
-            <tr><td>camp</td><td>5555</td><td>Кемп / хүн хүч</td></tr>
-            <tr><td>hse</td><td>6666</td><td>ХАБЭА</td></tr>
-            <tr><td>asuudal</td><td>7777</td><td>Асуудал</td></tr>
-          </tbody>
-        </table>
+      <div class="panel-head">
+        <div><h3>Хэрэглэгчид</h3><p>«PIN солих» дээр дарж 4-8 оронтой шинэ код оруулна.</p></div>
       </div>
+      <div id="userList"></div>
     </section>
   </main>
+  <script src="app.js"></script>
 </body>
 </html>

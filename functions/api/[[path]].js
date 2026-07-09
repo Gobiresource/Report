@@ -231,6 +231,33 @@ async function handlePlanSave(db, body) {
   return ok({month: body.month, plan: body.plan || {}});
 }
 
+// ---------- Хэрэглэгчийн удирдлага (зөвхөн admin) ----------
+async function handleUsersList(db, body) {
+  const user = await findUser(db, body.username, body.pin);
+  if (!user || !user.active) return fail('Нэвтрэлт хүчингүй байна. Дахин нэвтэрнэ үү.', 401);
+  if (user.role !== 'admin') return fail('Хэрэглэгчийн удирдлага зөвхөн админд нээлттэй.', 403);
+  const rows = await db.prepare(
+    `SELECT id, username, name, role, department, active FROM users ORDER BY role = 'admin' DESC, username`
+  ).all();
+  return ok({users: rows.results || []});
+}
+
+async function handleUserSetPin(db, body) {
+  const user = await findUser(db, body.username, body.pin);
+  if (!user || !user.active) return fail('Нэвтрэлт хүчингүй байна. Дахин нэвтэрнэ үү.', 401);
+  if (user.role !== 'admin') return fail('PIN солих эрх зөвхөн админд бий.', 403);
+  const targetId = parseInt(body.user_id, 10);
+  const newPin = String(body.new_pin || '').trim();
+  if (!targetId) return fail('Хэрэглэгчийн ID байхгүй.');
+  if (!/^\d{4,8}$/.test(newPin)) return fail('PIN 4-8 оронтой тоо байх ёстой.');
+  const target = await db.prepare(`SELECT id, username FROM users WHERE id = ? LIMIT 1`).bind(targetId).first();
+  if (!target) return fail('Хэрэглэгч олдсонгүй.', 404);
+  await db.prepare(`UPDATE users SET pin = ? WHERE id = ?`).bind(newPin, targetId).run();
+  // Аюулгүй байдлын үүднээс шинэ PIN-ийг audit log-д БИЧИХГҮЙ
+  await logAction(db, user.id, 'user_set_pin', target.username, {user_id: targetId});
+  return await handleUsersList(db, body);
+}
+
 /* ---------------------------------------------------------------
    Entry point
    --------------------------------------------------------------- */
@@ -252,6 +279,8 @@ export async function onRequest(context) {
     if (method === 'POST' && route === 'vehicles/remove') return await handleVehicleRemove(env.DB, await readBody(request));
     if (method === 'POST' && route === 'plan')       return await handlePlanGet(env.DB, await readBody(request));
     if (method === 'POST' && route === 'plan/save')  return await handlePlanSave(env.DB, await readBody(request));
+    if (method === 'POST' && route === 'users')        return await handleUsersList(env.DB, await readBody(request));
+    if (method === 'POST' && route === 'users/setpin') return await handleUserSetPin(env.DB, await readBody(request));
     return fail('API endpoint олдсонгүй: ' + route, 404);
   } catch (err) {
     return fail(err.message || 'Серверийн алдаа гарлаа.', 500);

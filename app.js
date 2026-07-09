@@ -269,6 +269,8 @@ const API = (() => {
     vehicleSave: (vehicle) => call('/api/vehicles/save', withAuth({vehicle})),
     vehicleRemove: (id) => call('/api/vehicles/remove', withAuth({id})),
     plan: (month) => call('/api/plan', withAuth({month})),
+    users: () => call('/api/users', withAuth({})),
+    userSetPin: (user_id, new_pin) => call('/api/users/setpin', withAuth({user_id, new_pin})),
     planSave: (month, plan) => call('/api/plan/save', withAuth({month, plan}))
   };
 })();
@@ -306,6 +308,8 @@ const UI = (() => {
       if(s) btn.classList.remove('hidden');
       btn.onclick = () => { SESSION.clear(); location.href = 'index.html'; };
     });
+    // Хэрэглэгчийн удирдлагын холбоос — зөвхөн админд харагдана
+    $$('#adminLink').forEach(el => { if(s && s.role === 'admin') el.classList.remove('hidden'); });
   }
   /** KPI тоог 0-ээс зорилтот утга руу зөөлөн гүйлгэж тоолно (ease-out). */
   function animateCounts(root){
@@ -1431,6 +1435,89 @@ const PageReport = () => {
 };
 
 /* ================================================================
+   PAGE: ADMIN — хэрэглэгчийн удирдлага (PIN солих)
+   ================================================================ */
+const PageAdmin = () => {
+  UI.paintUserChrome();
+  const session = SESSION.get();
+  if(!session){ location.href = 'index.html'; return; }
+  if(session.role !== 'admin'){ location.href = 'dashboard.html'; return; }
+
+  const box = UI.$('#userList');
+  const msg = UI.$('#adminMessage');
+  if(!box) return;
+
+  const ROLE_LABELS = {admin:'Админ', worker:'Ажилтан', viewer:'Захирал / үзэгч'};
+  let USERS = [];
+
+  async function load(){
+    box.innerHTML = '<div class="module-empty">Ачаалж байна…</div>';
+    try{
+      const res = await API.users();
+      USERS = res.users || [];
+      render();
+    }catch(err){ box.innerHTML = `<div class="module-empty">${UI.esc(err.message)}</div>`; }
+  }
+
+  function render(){
+    box.innerHTML = `<div class="table-wrap"><table class="table">
+      <thead><tr><th>Нэвтрэх нэр</th><th>Нэр</th><th>Эрх</th><th>Төлөв</th><th class="right">PIN</th></tr></thead>
+      <tbody>` + USERS.map(u => `<tr data-uid="${u.id}">
+        <td><b>${UI.esc(u.username)}</b></td>
+        <td>${UI.esc(u.name || '—')}</td>
+        <td>${UI.esc(ROLE_LABELS[u.role] || u.role)}${u.department ? ' · ' + UI.esc(u.department) : ''}</td>
+        <td>${u.active ? '<span class="pin-badge pin-on">Идэвхтэй</span>' : '<span class="pin-badge pin-off">Идэвхгүй</span>'}</td>
+        <td class="right">
+          <span class="pin-edit hidden">
+            <input class="pin-input" type="password" inputmode="numeric" maxlength="8" placeholder="Шинэ PIN" autocomplete="new-password">
+            <button type="button" class="btn btn-primary btn-sm pin-save">Хадгалах</button>
+            <button type="button" class="btn btn-soft btn-sm pin-cancel">Болих</button>
+          </span>
+          <button type="button" class="btn btn-soft btn-sm pin-toggle">PIN солих</button>
+        </td>
+      </tr>`).join('') + `</tbody></table></div>`;
+
+    UI.$$('.pin-toggle', box).forEach(btn => btn.onclick = () => {
+      const tr = btn.closest('tr');
+      btn.classList.add('hidden');
+      tr.querySelector('.pin-edit').classList.remove('hidden');
+      tr.querySelector('.pin-input').focus();
+    });
+    UI.$$('.pin-cancel', box).forEach(btn => btn.onclick = () => render());
+    UI.$$('.pin-save', box).forEach(btn => btn.onclick = () => savePin(btn));
+    UI.$$('.pin-input', box).forEach(inp => inp.addEventListener('keydown', e => {
+      if(e.key === 'Enter'){ e.preventDefault(); savePin(inp); }
+    }));
+  }
+
+  async function savePin(el){
+    const tr = el.closest('tr');
+    const uid = tr.dataset.uid;
+    const inp = tr.querySelector('.pin-input');
+    const pin = inp.value.trim();
+    if(!/^\d{4,8}$/.test(pin)){ UI.alertBox(msg, 'PIN 4-8 оронтой тоо байх ёстой.'); inp.focus(); return; }
+    const target = USERS.find(u => String(u.id) === String(uid));
+    if(!confirm(`«${target ? target.username : uid}» хэрэглэгчийн PIN-ийг солих уу?`)) return;
+    try{
+      const res = await API.userSetPin(uid, pin);
+      USERS = res.users || USERS;
+      // Админ ӨӨРИЙН PIN-ээ сольсон бол одоогийн session хүчингүй болно — дахин нэвтрүүлнэ
+      if(target && target.username === session.username){
+        alert('Та өөрийн PIN-ээ сольсон тул шинэ PIN-ээрээ дахин нэвтэрнэ үү.');
+        SESSION.clear(); location.href = 'index.html'; return;
+      }
+      render();
+      UI.alertBox(msg, `«${target ? target.username : ''}» хэрэглэгчийн PIN амжилттай солигдлоо.`, true);
+    }catch(err){
+      if(/нэвтрэлт хүчингүй/i.test(err.message)){ SESSION.clear(); location.href = 'index.html'; return; }
+      UI.alertBox(msg, err.message);
+    }
+  }
+
+  load();
+};
+
+/* ================================================================
    ROUTER — хуудас бүрийн эхлүүлэгч
    ================================================================ */
 document.addEventListener('DOMContentLoaded', () => {
@@ -1438,4 +1525,5 @@ document.addEventListener('DOMContentLoaded', () => {
   if(page === 'login')     PageLogin();
   if(page === 'dashboard') PageDashboard();
   if(page === 'report')    PageReport();
+  if(page === 'admin')     PageAdmin();
 });
