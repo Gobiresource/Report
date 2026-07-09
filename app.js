@@ -136,14 +136,14 @@ const CONFIG = (() => {
       viz: (d, ctx) => {
         const val = num(d.shift_day_product_ton) + num(d.shift_night_product_ton);
         const planMonth = ctx && ctx.plan ? num(ctx.plan.production_ton) : 0;
-        let target = null, label = 'тн баяжуулсан';
+        let target = null, label = 'Баяжуулсан бүтээгдэхүүн';
         if(planMonth > 0 && ctx.date){
           const dt = new Date(ctx.date + 'T00:00:00');
           const days = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate();
           target = planMonth / days;
-          label = 'тн · Төлөвлөгөө дундаж ' + UI.fmt(target) + ' тн/өдөр';
+          label = 'Төлөвлөгөөний дундаж ' + UI.fmt(target) + ' тн/өдөр';
         }
-        return UI.gaugeHtml(val, target, label);
+        return UI.gaugeHtml(val, target, label, 'тн');
       }
     },
     {
@@ -209,10 +209,14 @@ const CONFIG = (() => {
       key:'hse', label:'ХАБ зөрчил / Эмнэлэг', unit:'', lowerBetter:true,
       calc: d => num(d.hse_violation_count) + num(d.medical_assistance_count),
       sub: d => `Зөрчил ${num(d.hse_violation_count)} · Тусламж ${num(d.medical_assistance_count)}`,
-      warnIf: d => (num(d.hse_violation_count) + num(d.medical_assistance_count)) > 0
+      warnIf: d => (num(d.hse_violation_count) + num(d.medical_assistance_count)) > 0,
+      mini: d => [
+        {label:'Зөрчил', value:num(d.hse_violation_count), color:'var(--c-hse)'},
+        {label:'Эмнэлэг', value:num(d.medical_assistance_count), color:'var(--c-camp)'}
+      ]
     },
     {
-      key:'issue', label:'Асуудал', unit:'', lowerBetter:true,
+      key:'issue', label:'Асуудал', unit:'', lowerBetter:true, fullRow:true,
       calc: d => d.issue_text ? 1 : 0,
       sub: d => d.status === 'open' ? 'Нээлттэй асуудал байна' : (d.issue_text ? 'Шийдэгдсэн' : 'Бүртгэл алга'),
       warnIf: d => d.status === 'open'
@@ -384,12 +388,13 @@ const UI = (() => {
     }).join('') + `</div>`;
   }
 
-  /** Хагас дугуй gauge: зүү нь value-г заана, target (төлөвлөгөөний дундаж) тэмдэглэгдэнэ */
-  function gaugeHtml(value, target, centerLabel){
+  /** Хагас дугуй gauge: гэрэлтсэн хуваарь + богино заагч нь value-г, алтан хуваарь нь target-ыг заана.
+      Тоо нуман дотроо, тайлбар нь графикийн ДООР тусдаа мөрөнд — хэзээ ч давхарлахгүй. */
+  function gaugeHtml(value, target, caption, unit){
     const max = Math.max(target ? target * 2 : 0, value * 1.15, 1);
     const frac = Math.min(Math.max(value / max, 0), 1);
     const tFrac = target ? Math.min(target / max, 1) : null;
-    const N = 29, cx = 100, cy = 96, r1 = 62, r2 = 86;
+    const N = 29, cx = 100, cy = 92, r1 = 66, r2 = 88;
     let ticks = '';
     for(let i = 0; i < N; i++){
       const f = i / (N - 1);
@@ -401,15 +406,19 @@ const UI = (() => {
       ticks += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
         class="gauge-tick ${on ? 'on' : ''} ${isTarget ? 'target' : ''}"/>`;
     }
+    // Богино заагч — хуваарийн дотоод захад (r 50–61), голын тоотой огтлолцохгүй
     const na = Math.PI * (1 - frac);
-    const nx = cx + 56 * Math.cos(na), ny = cy - 56 * Math.sin(na);
+    const px1 = cx + 50 * Math.cos(na), py1 = cy - 50 * Math.sin(na);
+    const px2 = cx + 61 * Math.cos(na), py2 = cy - 61 * Math.sin(na);
     return `<div class="gauge-wrap">
-      <svg viewBox="0 0 200 104" class="gauge-svg">
-        ${ticks}
-        <line x1="${cx}" y1="${cy}" x2="${nx.toFixed(1)}" y2="${ny.toFixed(1)}" class="gauge-needle"/>
-        <circle cx="${cx}" cy="${cy}" r="5" class="gauge-hub"/>
-      </svg>
-      <div class="gauge-center"><b class="count" data-count="${value}">${fmt(value)}</b><small>${esc(centerLabel || '')}</small></div>
+      <div class="gauge-fig">
+        <svg viewBox="0 0 200 96" class="gauge-svg">
+          ${ticks}
+          <line x1="${px1.toFixed(1)}" y1="${py1.toFixed(1)}" x2="${px2.toFixed(1)}" y2="${py2.toFixed(1)}" class="gauge-needle"/>
+        </svg>
+        <div class="gauge-center"><b class="count" data-count="${value}">${fmt(value)}</b>${unit ? `<span class="gauge-unit">${esc(unit)}</span>` : ''}</div>
+      </div>
+      ${caption ? `<div class="gauge-caption">${esc(caption)}</div>` : ''}
     </div>`;
   }
 
@@ -417,7 +426,10 @@ const UI = (() => {
   let waveId = 0;
   function waveChartHtml(points, color){
     if(!points.length) return '';
-    const stepX = 86, padL = 30, padR = 30, topPad = 40, H = 150, chartH = H - topPad - 16;
+    // Цэг цөөхөн үед алхмыг өргөсгөж графикийг картын бүтэн өргөнд ойртуулна (86–150px).
+    // Захын шошго таслагдахгүйн тулд padL/padR = 46.
+    const stepX = points.length > 1 ? Math.min(Math.max(908 / (points.length - 1), 86), 150) : 0;
+    const padL = 46, padR = 46, topPad = 40, H = 150, chartH = H - topPad - 16;
     const W = padL + padR + Math.max((points.length - 1) * stepX, 40);
     const maxV = Math.max(...points.map(p => p.value), 1);
     const xy = points.map((p, i) => ({
@@ -435,7 +447,7 @@ const UI = (() => {
     const gid = 'wg' + (++waveId);
     const guides = xy.map(p => `
       <line x1="${p.x}" y1="${topPad - 6}" x2="${p.x}" y2="${H - 14}" class="wave-guide"/>
-      <text x="${p.x}" y="14" class="wave-label" text-anchor="middle">${esc(String(p.label).slice(0, 12))}</text>
+      <text x="${p.x}" y="14" class="wave-label" text-anchor="middle">${esc(String(p.label).length > 12 ? String(p.label).slice(0, 11) + '…' : String(p.label))}</text>
       <text x="${p.x}" y="30" class="wave-value" text-anchor="middle">${fmt(p.value)}</text>
       <circle cx="${p.x}" cy="${p.y}" r="4" class="wave-dot" style="fill:${color}"/>`).join('');
     return `<div class="wave-scroll"><svg viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" class="wave-svg">
@@ -608,9 +620,10 @@ const PageDashboard = () => {
       const type = CONFIG.reportTypes.find(t => t.key === c.key) || {};
       const chip = `<span class="mchip" style="background:${type.color}">${type.icon || ''}</span>`;
       const featured = c.featured ? 'card-featured' : '';
+      const fullRow = c.fullRow ? 'card-full' : '';
 
       if(!r){
-        return `<div class="bezel card card-missing ${featured}"><span class="tick-a"></span><span class="tick-b"></span>
+        return `<div class="bezel card card-missing ${featured} ${fullRow}"><span class="tick-a"></span><span class="tick-b"></span>
           <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span></div>
           <div class="value">—</div><div class="sub">Тайлан ороогүй</div></div>`;
       }
@@ -646,7 +659,7 @@ const PageDashboard = () => {
           const h = Math.max((i.value / max) * 100, 4);
           return `<div class="mini-bar-col" title="${UI.esc(i.label)}: ${UI.fmt(i.value)}">
             <span class="mini-bar-val">${UI.fmtShort(i.value)}</span>
-            <span class="mini-bar" style="height:${h.toFixed(0)}%;${i.color ? 'background:'+i.color : ''}"></span>
+            <span class="mini-bar-track"><span class="mini-bar" style="height:${h.toFixed(0)}%;${i.color ? 'background:'+i.color : ''}"></span></span>
             <span class="mini-bar-label">${UI.esc(i.label)}</span>
           </div>`;
         }).join('') + `</div>`;
@@ -656,7 +669,7 @@ const PageDashboard = () => {
         ? ''
         : `<div class="value"><span class="count" data-count="${val}">${UI.fmt(val)}</span>${c.unit ? ' <span class="unit">'+c.unit+'</span>' : ''}</div>`;
       const wide = (c.viz && miniHtml) ? 'card-wide' : '';
-      return `<div class="bezel card ${warn?'card-warn':''} ${featured} ${wide}"><span class="tick-a"></span><span class="tick-b"></span>
+      return `<div class="bezel card ${warn?'card-warn':''} ${featured} ${wide} ${fullRow}"><span class="tick-a"></span><span class="tick-b"></span>
         <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span>${trendChip}</div>
         ${valueRow}
         ${miniHtml}
@@ -813,18 +826,58 @@ const PageDashboard = () => {
       const openIssues = (byType['issue']||[]).filter(r => r.data.status === 'open').length;
 
       const fuelIncome = (byType['fuel']||[]).reduce((a,r)=>a+CONFIG.num(r.data.fuel_income_liter!=null?r.data.fuel_income_liter:r.data.fuel_truck_income_liter),0);
+
+      // Өдөр тутмын цуваа: харагдах өдрийн тоо = энэ сар бол өнөөдрийн өдөр, өнгөрсөн сар бол сарын бүтэн өдрүүд
+      const [my, mm] = month.split('-').map(Number);
+      const dim = new Date(my, mm, 0).getDate();
+      const nowD = new Date();
+      const ND = (my === nowD.getFullYear() && mm === nowD.getMonth() + 1) ? nowD.getDate() : dim;
+      const mkSer = () => Array(ND).fill(0);
+      const ser = {inc:mkSer(), prod:mkSer(), trans:mkSer(), exp:mkSer(), hse:mkSer(), weigh:mkSer(), iss:mkSer()};
+      (res.reports||[]).forEach(r => {
+        const day = parseInt((r.date||'').slice(8), 10);
+        if(!day || day > ND) return;
+        const d = r.data || {}, i = day - 1;
+        if(r.report_type === 'fuel'){
+          ser.inc[i] += CONFIG.num(d.fuel_income_liter != null ? d.fuel_income_liter : d.fuel_truck_income_liter);
+          ser.exp[i] += d.fuel_expense_liter != null ? CONFIG.num(d.fuel_expense_liter)
+            : CONFIG.num(d.fuel_truck_machine_liter) + CONFIG.num(d.fuel_truck_plant_liter) + CONFIG.num(d.reserve_tank_expense_liter);
+        }
+        if(r.report_type === 'production') ser.prod[i] += CONFIG.num(d.shift_day_product_ton) + CONFIG.num(d.shift_night_product_ton);
+        if(r.report_type === 'transport'){
+          ser.trans[i] += CONFIG.num(d.sludge_ton) + CONFIG.num(d.waste_ton) + CONFIG.num(d.short_waste_ton) + CONFIG.num(d.product_transport_ton);
+          ser.weigh[i] += CONFIG.num(d.weighbridge_net_ton);
+        }
+        if(r.report_type === 'hse') ser.hse[i] += CONFIG.num(d.hse_violation_count) + CONFIG.num(d.medical_assistance_count);
+        if(r.report_type === 'issue' && d.status === 'open') ser.iss[i] += 1;
+      });
+
+      // Pill баганан мини график: өдөр бүр нэг суваг, өгөгдөлтэй өдөр өнгөтэй
+      const colsHtml = (arr, color) => {
+        const mx = Math.max(...arr, 1);
+        const dense = arr.length > 14 ? ' m-dense' : '';
+        const showLbl = i => arr.length <= 10 || i === 0 || i === arr.length - 1 || (i + 1) % 5 === 0;
+        return `<div class="m-cols${dense}">` + arr.map(v =>
+          `<span class="m-col"><span class="m-fill" style="height:${Math.max(v/mx*100, 4).toFixed(0)}%;${v > 0 ? 'background:'+color : ''}"></span></span>`
+        ).join('') + `</div>
+        <div class="m-days${dense}">` + arr.map((_, i) => `<span>${showLbl(i) ? i + 1 : ''}</span>`).join('') + `</div>`;
+      };
+
+      const GREEN = 'var(--green)', RED = 'var(--brand)', AMBER = 'var(--c-transport)';
       const cards = [
-        ['Түлшний орлого нийт', UI.fmt(fuelIncome)+' л', count('fuel')+' өдрийн тайлан'],
-        ['Бүтээгдэхүүн нийт', UI.fmt(sum('production','shift_day_product_ton')+sum('production','shift_night_product_ton'))+' тн', count('production')+' өдрийн тайлан'],
-        ['Тээвэр нийт', UI.fmt(sum('transport','sludge_ton')+sum('transport','waste_ton')+sum('transport','short_waste_ton')+sum('transport','product_transport_ton'))+' тн', count('transport')+' өдрийн тайлан'],
-        ['Түлшний зарлага нийт', UI.fmt((byType['fuel']||[]).reduce((a,r)=>a+(r.data.fuel_expense_liter!=null?CONFIG.num(r.data.fuel_expense_liter):CONFIG.num(r.data.fuel_truck_machine_liter)+CONFIG.num(r.data.fuel_truck_plant_liter)+CONFIG.num(r.data.reserve_tank_expense_liter)),0))+' л', count('fuel')+' өдрийн тайлан'],
-        ['ХАБ зөрчил / Эмнэлэг', UI.fmt(sum('hse','hse_violation_count'))+' / '+UI.fmt(sum('hse','medical_assistance_count')), count('hse')+' өдрийн тайлан'],
-        ['Пүүний нийт жин', UI.fmt(sum('transport','weighbridge_net_ton'))+' тн', 'тээврийн тайлангаас'],
-        ['Нээлттэй асуудал', String(openIssues), count('issue')+' бүртгэл']
+        ['Түлшний орлого нийт', UI.fmt(fuelIncome)+' л', count('fuel')+' өдрийн тайлан', ser.inc, GREEN],
+        ['Бүтээгдэхүүн нийт', UI.fmt(sum('production','shift_day_product_ton')+sum('production','shift_night_product_ton'))+' тн', count('production')+' өдрийн тайлан', ser.prod, RED],
+        ['Тээвэр нийт', UI.fmt(sum('transport','sludge_ton')+sum('transport','waste_ton')+sum('transport','short_waste_ton')+sum('transport','product_transport_ton'))+' тн', count('transport')+' өдрийн тайлан', ser.trans, RED],
+        ['Түлшний зарлага нийт', UI.fmt((byType['fuel']||[]).reduce((a,r)=>a+(r.data.fuel_expense_liter!=null?CONFIG.num(r.data.fuel_expense_liter):CONFIG.num(r.data.fuel_truck_machine_liter)+CONFIG.num(r.data.fuel_truck_plant_liter)+CONFIG.num(r.data.reserve_tank_expense_liter)),0))+' л', count('fuel')+' өдрийн тайлан', ser.exp, RED],
+        ['ХАБ зөрчил / Эмнэлэг', UI.fmt(sum('hse','hse_violation_count'))+' / '+UI.fmt(sum('hse','medical_assistance_count')), count('hse')+' өдрийн тайлан', ser.hse, AMBER],
+        ['Пүүний нийт жин', UI.fmt(sum('transport','weighbridge_net_ton'))+' тн', 'тээврийн тайлангаас', ser.weigh, GREEN],
+        ['Нээлттэй асуудал', String(openIssues), count('issue')+' бүртгэл', ser.iss, AMBER]
       ];
       box.innerHTML = cards.map(c => `<div class="bezel card"><span class="tick-a"></span><span class="tick-b"></span>
         <div class="card-tag-row"><span class="label">${UI.esc(c[0])}</span></div>
-        <div class="value">${UI.esc(c[1])}</div><div class="sub">${UI.esc(c[2])}</div></div>`).join('');
+        <div class="value">${UI.esc(c[1])}</div>
+        ${colsHtml(c[3], c[4])}
+        <div class="sub">${UI.esc(c[2])}</div></div>`).join('');
 
       // Бодит гүйцэтгэлийг хадгалж, төлөвлөгөөтэй харьцуулна
       const actual = {
@@ -842,18 +895,29 @@ const PageDashboard = () => {
     }
   }
 
-  // Төлөвлөгөөний үзүүлэлтүүд — компанийн сарын төлөвлөгөөний бодит бүтцээр
-  // (Бүтээгдэхүүн үйлдвэрлэлт тн, Шлам олборлолт тн + рейс, Бүтээгдэхүүн тээвэр тн + рейс, Түлш л)
+  // Төлөвлөгөөний үзүүлэлтүүд — компанийн сарын төлөвлөгөөний БОДИТ бүтэц:
+  // Бүтээгдэхүүн үйлдвэрлэлт /тн/ · Шлам олборлолт /тн/ ·
+  // Бүтээгдэхүүн тээвэрлэлт /машин, рейс/ · Шлам тээвэрлэлт /машин, рейс/
   const PLAN_METRICS = [
-    {key:'production_ton', label:'Бүтээгдэхүүн үйлдвэрлэлт', unit:'тн', higherBetter:true},
-    {key:'sludge_ton', label:'Шлам олборлолт / тээвэрлэлт', unit:'тн', higherBetter:true},
-    {key:'sludge_trips', label:'Шлам тээвэрлэлт', unit:'рейс', higherBetter:true},
-    {key:'product_transport_ton', label:'Бүтээгдэхүүн тээвэрлэлт', unit:'тн', higherBetter:true},
-    {key:'product_transport_trips', label:'Бүтээгдэхүүн тээвэрлэлт', unit:'рейс', higherBetter:true},
-    {key:'fuel_expense_liter', label:'Түлшний зарлага', unit:'л', higherBetter:false}
+    {key:'production_ton', label:'Бүтээгдэхүүн үйлдвэрлэлт', unit:'тн'},
+    {key:'sludge_ton', label:'Шлам олборлолт', unit:'тн'},
+    {key:'product_transport_trips', label:'Бүтээгдэхүүн тээвэрлэлт', unit:'рейс', vehiclesKey:'product_transport_vehicles'},
+    {key:'sludge_trips', label:'Шлам тээвэрлэлт', unit:'рейс', vehiclesKey:'sludge_vehicles'}
   ];
   let currentPlan = {};
   let currentActual = {};
+
+  /** Сарын явц: харагдаж буй сар өнгөрсөн бол 1, ирээдүйн сар бол 0, энэ сар бол өдрийн харьцаа */
+  function monthElapsedFrac(month){
+    const now = new Date();
+    const [yy, mm] = month.split('-').map(Number);
+    if(!yy || !mm) return 1;
+    if(yy === now.getFullYear() && mm === now.getMonth() + 1){
+      const days = new Date(yy, mm, 0).getDate();
+      return Math.min(now.getDate() / days, 1);
+    }
+    return new Date(yy, mm - 1, 1) < now ? 1 : 0;
+  }
 
   async function renderPlanVsActual(month, actual){
     currentActual = actual;
@@ -865,31 +929,80 @@ const PageDashboard = () => {
     }catch(e){ currentPlan = {}; }
 
     const isAdmin = (SESSION.get() || {}).role === 'admin';
-    const rows = PLAN_METRICS.map(m => {
+    const elapsed = monthElapsedFrac(month);
+    const paceLeft = Math.round(elapsed * 100);
+
+    // Activity ring: биелэлтийг цагирагаар, өнөөдрийн явцыг цагираг дээрх зураасаар
+    let ringId = 0;
+    const ring = (pct, tone, paceFrac) => {
+      const R = 40, C = 2 * Math.PI * R;
+      const fill = pct === null ? 0 : Math.min(pct, 100) / 100;
+      const colors = tone === 'plan-good' ? ['#5AD97C', '#28B14C']
+                   : tone === 'plan-low'  ? ['#FF8A7A', '#E44332']
+                   : ['#FFCF4D', '#F5920B'];
+      const gid = 'prg' + (++ringId) + month.replace('-', '');
+      let pace = '';
+      if(paceFrac > 0 && paceFrac < 1){
+        const a = paceFrac * 2 * Math.PI - Math.PI / 2;
+        const x1 = 50 + 33 * Math.cos(a), y1 = 50 + 33 * Math.sin(a);
+        const x2 = 50 + 47 * Math.cos(a), y2 = 50 + 47 * Math.sin(a);
+        pace = `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" class="plan-ring-pace"/>`;
+      }
+      const pctText = pct === null ? '—' : (pct > 999 ? '>999%' : pct + '%');
+      return `<div class="plan-ring">
+        <svg viewBox="0 0 100 100">
+          <defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1">
+            <stop offset="0%" stop-color="${colors[0]}"/><stop offset="100%" stop-color="${colors[1]}"/>
+          </linearGradient></defs>
+          <circle cx="50" cy="50" r="${R}" fill="none" class="plan-ring-track" stroke-width="9"/>
+          ${fill > 0 ? `<circle cx="50" cy="50" r="${R}" fill="none" stroke="url(#${gid})" stroke-width="9" stroke-linecap="round"
+            stroke-dasharray="${(fill * C).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 50 50)" class="plan-ring-fill"/>` : ''}
+          ${pace}
+        </svg>
+        <div class="plan-ring-center"><b class="${tone}">${pctText}</b></div>
+      </div>`;
+    };
+
+    const cards = PLAN_METRICS.map(m => {
       const plan = CONFIG.num(currentPlan[m.key]);
       const act = CONFIG.num(actual[m.key]);
+      const vehicles = m.vehiclesKey ? CONFIG.num(currentPlan[m.vehiclesKey]) : 0;
       const hasPlan = plan > 0;
       const pct = hasPlan ? Math.round((act / plan) * 100) : null;
-      // Түлш зарлага бол бага нь сайн — 100%-иас доош байвал ногоон
-      const good = pct === null ? '' : (m.higherBetter ? (pct >= 100 ? 'plan-good' : (pct >= 80 ? 'plan-mid' : 'plan-low'))
-                                                       : (pct <= 100 ? 'plan-good' : 'plan-low'));
-      const barPct = pct === null ? 0 : Math.min(pct, 100);
-      return `<div class="plan-row">
-        <div class="plan-row-head">
-          <span class="plan-name">${UI.esc(m.label)}</span>
-          <span class="plan-nums">${UI.fmt(act)} / ${hasPlan ? UI.fmt(plan) : '—'} ${m.unit} ${pct!==null?`<b class="${good}">${pct}%</b>`:''}</span>
+      // Үнэлгээг сарын бүтэн дүнгээр бус ӨНӨӨДРИЙН явцтай харьцуулж өгнө —
+      // сарын дундуур 40% биелэлт "муу" биш, явцаасаа түрүүлж байвал ногоон.
+      const paceTarget = hasPlan ? plan * elapsed : 0;
+      let tone = '';
+      if(hasPlan){
+        if(paceTarget <= 0) tone = 'plan-mid';
+        else if(act >= paceTarget) tone = 'plan-good';
+        else if(act >= paceTarget * 0.8) tone = 'plan-mid';
+        else tone = 'plan-low';
+      }
+      const showPace = hasPlan && elapsed > 0 && elapsed < 1;
+      const foot = !hasPlan
+        ? 'Төлөвлөгөө оруулаагүй'
+        : showPace
+          ? `Сарын явц ${paceLeft}% · Өнөөдрийн зорилт ${UI.fmt(Math.round(paceTarget))} ${m.unit}`
+          : (elapsed >= 1 ? 'Сар дууссан — эцсийн гүйцэтгэл' : 'Сар эхлээгүй');
+      return `<div class="plan-card">
+        ${ring(pct, tone || 'plan-mid', showPace ? elapsed : 0)}
+        <div class="plan-info">
+          <div class="plan-name">${UI.esc(m.label)}${vehicles ? `<span class="plan-veh">${UI.fmt(vehicles)} машин</span>` : ''}</div>
+          <div class="plan-card-nums"><b class="count" data-count="${act}">${UI.fmt(act)}</b><span class="plan-target">/ ${hasPlan ? UI.fmt(plan) : '—'} ${m.unit}</span></div>
+          <div class="plan-foot">${foot}</div>
         </div>
-        <div class="plan-bar"><div class="plan-bar-fill ${good}" style="width:${barPct}%"></div></div>
       </div>`;
     }).join('');
 
     box.innerHTML = `<section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
       <div class="panel-head">
-        <div><h3>Сарын төлөвлөгөө — гүйцэтгэл</h3><p>Тухайн сарын бодит дүнг төлөвлөгөөтэй харьцуулсан биелэлт.</p></div>
+        <div><h3>Сарын төлөвлөгөө — гүйцэтгэл</h3><p>Компанийн сарын төлөвлөгөөний биелэлт. Цагираг дээрх зураас нь өнөөдрийн явцын түвшин.</p></div>
         ${isAdmin ? '<button class="btn btn-soft" id="editPlanBtn">Төлөвлөгөө засах</button>' : ''}
       </div>
-      <div id="planBody">${rows}</div>
+      <div id="planBody" class="plan-grid">${cards}</div>
     </section>`;
+    UI.animateCounts(UI.$('#planBody'));
 
     if(isAdmin){
       UI.$('#editPlanBtn').onclick = () => renderPlanEditor(month);
@@ -899,10 +1012,14 @@ const PageDashboard = () => {
   function renderPlanEditor(month){
     const body = UI.$('#planBody');
     if(!body) return;
+    body.classList.remove('plan-grid');
     body.innerHTML = PLAN_METRICS.map(m => `<div class="plan-edit-row">
       <label>${UI.esc(m.label)} (${m.unit})</label>
       <input type="number" step="any" min="0" data-key="${m.key}" value="${currentPlan[m.key] ?? ''}" placeholder="Төлөвлөгөө оруулах">
-    </div>`).join('') +
+    </div>` + (m.vehiclesKey ? `<div class="plan-edit-row plan-edit-sub">
+      <label>${UI.esc(m.label)} — машины тоо</label>
+      <input type="number" step="1" min="0" data-key="${m.vehiclesKey}" value="${currentPlan[m.vehiclesKey] ?? ''}" placeholder="машин">
+    </div>` : '')).join('') +
     `<div class="form-actions"><button class="btn btn-soft" id="cancelPlanBtn">Болих</button><button class="btn btn-primary" id="savePlanBtn">Хадгалах</button></div>`;
 
     UI.$('#cancelPlanBtn').onclick = () => renderPlanVsActual(month, currentActual);
@@ -1314,7 +1431,7 @@ const PageReport = () => {
 };
 
 /* ================================================================
-   ROUTER
+   ROUTER — хуудас бүрийн эхлүүлэгч
    ================================================================ */
 document.addEventListener('DOMContentLoaded', () => {
   const page = document.body.dataset.page;
