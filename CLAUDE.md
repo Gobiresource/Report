@@ -15,10 +15,14 @@
 - Cloudflare Pages + Pages Functions + D1 SQLite (binding: DB → govi_dashboard).
 - Frontend: vanilla JS (framework байхгүй), нэг app.js, нэг style.css.
   График бүгд гар бичмэл inline SVG/HTML (сан ашигладаггүй).
-- **Deploy: terminal-аас `.\deploy.ps1`** — зөвхөн html/js/css/png-г dist-д
-  хуулж `npx wrangler pages deploy dist --project-name report --branch main`.
-  Project нэр нь **report** (домэйн report-d3e.pages.dev). GitHub автомат
-  deploy УНТРААСАН — GitHub push нь сайтад нөлөөлөхгүй, wrangler л deploy хийнэ.
+- **Deploy — 2 арга** (project нэр **report**, домэйн report-d3e.pages.dev):
+  1. `git push` → GitHub авто-deploy (Cloudflare Build configuration-д:
+     Build command `mkdir -p dist && cp index.html dashboard.html report.html
+     admin.html app.js style.css logo.png favicon.png dist/`, output `dist`,
+     Branch control → Automatic deployments: Enabled байх ёстой).
+     Энэ бол ҮНДСЭН арга — аль ч PC-ээс npm/wrangler-гүйгээр ажиллана.
+  2. `.\deploy.ps1` — wrangler-ээр шууд (эхний PC дээр тохируулагдсан).
+  Аль ч аргад зөвхөн html/js/css/png + functions/ л нийтлэгдэнэ.
 - dist-д schema.sql, CLAUDE.md, test_backend.cjs зэрэг дотоод файл ХЭЗЭЭ Ч
   оруулахгүй (static asset болж нийтэд ил гардаг байсныг зассан түүхтэй).
 - wrangler.toml-ийг repo/хавтсанд БАЙЛГАХГҮЙ.
@@ -119,8 +123,22 @@ migration хэрэггүй.
 - _mockup_v1.html, _mockup_v2.html — захиалагчийн таалагдсан дизайны лавлагаа
   (Claude-аар гаргуулсан загвар), deploy-д ордоггүй.
 
+## Олон PC дээр ажиллах
+- Үнэн эх сурвалж: GitHub repo **Gobiresource/Report** (private).
+- Шинэ PC: `git clone https://github.com/Gobiresource/Report.git` →
+  Cowork/Claude Code-д энэ хавтсыг сонгоход энэ файл контекст болно.
+- Ажил эхлэхдээ `git pull`, дуусахдаа `git add -A; git commit; git push`.
+- 2 дахь PC (C:\Users\GRD\Desktop\Report) дээр wrangler global суулгац
+  антивирус/ComSpec асуудлаар бүтээгүй — тэнд git push аргыг ашиглана.
+
+## Хүлээгдэж буй ажлууд
+- seed_test.cjs — 8-р сарын 1-8-нд тестийн тайлан цутгах скрипт бэлэн,
+  ХАРААХАН АЖИЛЛУУЛААГҮЙ. `node seed_test.cjs` (админ эрх нь файл дотроо).
+  Цэвэрлэх: D1 Console `DELETE FROM reports WHERE date LIKE '2026-08-%';`
+- Тээврийн бүтцийн 3 нээлттэй асуулт (дээрх хэсэгт) хариу хүлээж байгаа.
+- Нууц үгийн hash (одоо plain text).
+
 ## Ажлын горим
 - Дизайны өөрчлөлтийг эхлээд тайлбарлаж/үзүүлж баталгаажуулаад код руу оруулна.
-- Хэрэглэгч файлын карт илгээхийг хүсдэггүй — зөвхөн deploy заавар өгнө:
-  `cd <хавтас>; .\deploy.ps1`
+- Хэрэглэгч файлын карт илгээхийг хүсдэггүй — зөвхөн deploy заавар өгнө.
 - Бүх текст монголоор. Кодын тайлбар монголоор.
