@@ -148,16 +148,17 @@ const CONFIG = (() => {
     },
     {
       key:'transport', label:'Тээвэр', unit:'тн', vizReplacesValue:true,
+      // Богино рейс нь Бүтээгдэхүүн тээврийн хэсэг (хашаан доторх), Хаягдал тусдаа
       calc: d => num(d.sludge_ton) + num(d.waste_ton) + num(d.short_waste_ton) + num(d.product_transport_ton),
-      sub: d => `Шлам ${num(d.sludge_ton)} · Хаягдал ${num(d.waste_ton)+num(d.short_waste_ton)} · Бүт. ${num(d.product_transport_ton)}`,
+      sub: d => `Шлам ${num(d.sludge_ton)} · Хаягдал ${num(d.waste_ton)} · Бүт. ${num(d.product_transport_ton)+num(d.short_waste_ton)}`,
       viz: d => UI.donutHtml([
         {label:'Шлам', value:num(d.sludge_ton), color:'var(--c-fuel)'},
-        {label:'Хаягдал', value:num(d.waste_ton)+num(d.short_waste_ton), color:'var(--c-issue)'},
-        {label:'Бүтээгдэхүүн', value:num(d.product_transport_ton), color:'var(--c-transport)'}
+        {label:'Хаягдал', value:num(d.waste_ton), color:'var(--c-issue)'},
+        {label:'Бүтээгдэхүүн', value:num(d.product_transport_ton)+num(d.short_waste_ton), color:'var(--c-transport)'}
       ], UI.fmt(num(d.sludge_ton)+num(d.waste_ton)+num(d.short_waste_ton)+num(d.product_transport_ton)), 'Нийт тн', {compact:true, badges:true})
     },
     {
-      key:'fuel', label:'Түлшний зарлага', unit:'л',
+      key:'fuel', label:'Түлшний зарлага', unit:'л', miniStyle:'hbars',
       calc: d => d.fuel_expense_liter !== undefined && d.fuel_expense_liter !== null
         ? num(d.fuel_expense_liter)
         : num(d.fuel_truck_machine_liter) + num(d.fuel_truck_plant_liter) + num(d.reserve_tank_expense_liter),
@@ -186,9 +187,9 @@ const CONFIG = (() => {
       }
     },
     {
-      key:'equipment', label:'Ажилласан техник', unit:'',
+      key:'equipment', label:'Ажилласан техник', unit:'', miniStyle:'segments',
       calc: d => num(d.main_working_count) + num(d.rental_sludge_working_count) + num(d.product_transport_working_count),
-      sub: d => `Засварт ${num(d.repair_count)} · Парк ${num(d.parked_count)}`,
+      sub: d => '', // хуваарилалт legend-д бүрэн харагдана
       mini: d => [
         {label:'Ажилласан', value:num(d.main_working_count)+num(d.rental_sludge_working_count)+num(d.product_transport_working_count), color:'var(--c-camp)'},
         {label:'Засварт', value:num(d.repair_count), color:'var(--warn)'},
@@ -196,9 +197,9 @@ const CONFIG = (() => {
       ]
     },
     {
-      key:'camp', label:'Нийт хүн хүч', unit:'',
+      key:'camp', label:'Нийт хүн хүч', unit:'', miniStyle:'segments',
       calc: d => num(d.mongolian_count) + num(d.chinese_count) + num(d.guard_count) + num(d.contractor_count) + num(d.camp_staff_count),
-      sub: d => `Монгол ${num(d.mongolian_count)} · Хятад ${num(d.chinese_count)} · Зочин ${num(d.guest_count)}`,
+      sub: d => num(d.guest_count) > 0 ? `Зочин ${num(d.guest_count)}` : '',
       mini: d => [
         {label:'Монгол', value:num(d.mongolian_count), color:'var(--c-production)'},
         {label:'Хятад', value:num(d.chinese_count), color:'var(--c-hse)'},
@@ -206,13 +207,13 @@ const CONFIG = (() => {
       ]
     },
     {
-      key:'hse', label:'ХАБ зөрчил / Эмнэлэг', unit:'', lowerBetter:true,
+      key:'hse', label:'ХАБ зөрчил / Эмнэлэг', unit:'', lowerBetter:true, miniStyle:'chips',
       calc: d => num(d.hse_violation_count) + num(d.medical_assistance_count),
-      sub: d => `Зөрчил ${num(d.hse_violation_count)} · Тусламж ${num(d.medical_assistance_count)}`,
+      sub: d => '', // chip-үүд бүрэн мэдээллийг агуулна
       warnIf: d => (num(d.hse_violation_count) + num(d.medical_assistance_count)) > 0,
       mini: d => [
-        {label:'Зөрчил', value:num(d.hse_violation_count), color:'var(--c-hse)'},
-        {label:'Эмнэлэг', value:num(d.medical_assistance_count), color:'var(--c-camp)'}
+        {label:'Зөрчил', value:num(d.hse_violation_count), tone:'bad'},
+        {label:'Эмнэлэг', value:num(d.medical_assistance_count), tone:'mid'}
       ]
     },
     {
@@ -271,6 +272,9 @@ const API = (() => {
     plan: (month) => call('/api/plan', withAuth({month})),
     users: () => call('/api/users', withAuth({})),
     userSetPin: (user_id, new_pin) => call('/api/users/setpin', withAuth({user_id, new_pin})),
+    userRename: (user_id, new_username, new_name) => call('/api/users/rename', withAuth({user_id, new_username, new_name})),
+    userCreate: (new_username, new_name, new_pin, permissions) => call('/api/users/create', withAuth({new_username, new_name, new_pin, permissions})),
+    userToggle: (user_id) => call('/api/users/toggle', withAuth({user_id})),
     planSave: (month, plan) => call('/api/plan/save', withAuth({month, plan}))
   };
 })();
@@ -426,6 +430,44 @@ const UI = (() => {
     </div>`;
   }
 
+  /** Жижиг картын визуал. style:
+      'segments' — бүхлийн хуваарилалтыг нэг зурваст (завсартай дугуй сегмент + legend),
+      'hbars'    — хэвтээ харьцуулалтын бар (хэмжээс эрс зөрүүтэй үед),
+      'chips'    — цөөн тоог өнгөт chip-ээр (0 үед "Зөрчилгүй өдөр"),
+      default    — босоо pill багана. */
+  function miniViz(items, style){
+    if(!items || !items.length) return '';
+    if(style === 'segments'){
+      const d = items.filter(i => i.value > 0);
+      if(!d.length) return '';
+      const tot = d.reduce((a, i) => a + i.value, 0) || 1;
+      return `<div class="seg-bar">${d.map(i =>
+        `<span style="width:${(i.value/tot*100).toFixed(1)}%;background:${i.color || 'var(--brand)'}"></span>`).join('')}</div>
+      <div class="seg-legend">${d.map(i =>
+        `<span class="sl"><i style="background:${i.color || 'var(--brand)'}"></i>${esc(i.label)} <b>${fmt(i.value)}</b></span>`).join('')}</div>`;
+    }
+    if(style === 'hbars'){
+      const mx = Math.max(...items.map(i => i.value), 1);
+      return `<div class="hbar-list">${items.map(i =>
+        `<div class="hbar-row"><span class="hl">${esc(i.label)}</span><span class="hbar-track"><span class="hbar-fill" style="width:${Math.max(i.value/mx*100, 2).toFixed(1)}%;background:${i.color || 'var(--brand)'}"></span></span><span class="hbar-val">${fmtShort(i.value)}</span></div>`).join('')}</div>`;
+    }
+    if(style === 'chips'){
+      const active = items.filter(i => i.value > 0);
+      if(!active.length) return `<div class="kpi-chips"><span class="kpi-chip ok">Зөрчилгүй өдөр</span></div>`;
+      return `<div class="kpi-chips">${active.map(i =>
+        `<span class="kpi-chip ${i.tone || 'bad'}">${esc(i.label)} ${fmt(i.value)}</span>`).join('')}</div>`;
+    }
+    const max = Math.max(...items.map(i => i.value), 1);
+    return `<div class="mini-bars">` + items.map(i => {
+      const h = Math.max((i.value / max) * 100, 4);
+      return `<div class="mini-bar-col" title="${esc(i.label)}: ${fmt(i.value)}">
+        <span class="mini-bar-val">${fmtShort(i.value)}</span>
+        <span class="mini-bar-track"><span class="mini-bar" style="height:${h.toFixed(0)}%;${i.color ? 'background:'+i.color : ''}"></span></span>
+        <span class="mini-bar-label">${esc(i.label)}</span>
+      </div>`;
+    }).join('') + `</div>`;
+  }
+
   /** Урсгал шугаман график: points = [{label, value}] — цэг бүрт тасархай шугам + нэр + тоо */
   let waveId = 0;
   function waveChartHtml(points, color){
@@ -467,7 +509,7 @@ const UI = (() => {
     </svg></div>`;
   }
 
-  return {esc, today, thisMonth, $, $$, fmt, fmtShort, alertBox, paintUserChrome, animateCounts, formatDateMn, donutHtml, barListHtml, gaugeHtml, waveChartHtml};
+  return {esc, today, thisMonth, $, $$, fmt, fmtShort, alertBox, paintUserChrome, animateCounts, formatDateMn, donutHtml, barListHtml, gaugeHtml, waveChartHtml, miniViz};
 })();
 
 /* ================================================================
@@ -538,8 +580,11 @@ const PageDashboard = () => {
     const msg = UI.$('#dashboardMessage');
     UI.alertBox(msg, '');
     // Hero-д тухайн өдрийн он/сар/өдрийг Монголоор бичнэ
+    // Тухайн өдрийн он сар өдөр гарчигт томоор, доор нь энгийн тайлбар
+    const heroDate = UI.$('#heroDate');
+    if(heroDate) heroDate.textContent = UI.formatDateMn(date);
     const heroLine = UI.$('#heroDateLine');
-    if(heroLine) heroLine.textContent = UI.formatDateMn(date) + ' — хэлтэс бүрийн тайлангийн нэгтгэл.';
+    if(heroLine) heroLine.textContent = 'Тайлангийн нэгтгэл';
     UI.$('#statusRow').innerHTML = '';
     UI.$('#summaryCards').innerHTML = '<div class="module-empty">Ачаалж байна…</div>';
     UI.$('#moduleDetail').innerHTML = '';
@@ -584,7 +629,6 @@ const PageDashboard = () => {
           </svg>
           <span class="ring-label">${submitted}/${total}</span>
         </div>
-        <span class="ring-cap">тайлан<br>ирсэн</span>
       </div>`;
       requestAnimationFrame(() => requestAnimationFrame(() => {
         const fg = UI.$('.ring-fg', ringBox);
@@ -652,32 +696,27 @@ const PageDashboard = () => {
         }
       }
 
-      // Карт доторх визуал: viz hook (gauge/donut) байвал түүнийг, үгүй бол мини bar
+      // Карт доторх визуал: viz hook (gauge/donut) байвал түүнийг,
+      // үгүй бол картын төрөлд тохирсон мини визуал (segments/hbars/chips/pill)
       let miniHtml = '';
       if(c.viz){
         miniHtml = c.viz(r.data, {plan: dashPlan, date: dashDate}) || '';
       } else if(c.mini){
-        const items = c.mini(r.data).filter(i => i.value > 0 || true);
-        const max = Math.max(...items.map(i => i.value), 1);
-        miniHtml = `<div class="mini-bars">` + items.map(i => {
-          const h = Math.max((i.value / max) * 100, 4);
-          return `<div class="mini-bar-col" title="${UI.esc(i.label)}: ${UI.fmt(i.value)}">
-            <span class="mini-bar-val">${UI.fmtShort(i.value)}</span>
-            <span class="mini-bar-track"><span class="mini-bar" style="height:${h.toFixed(0)}%;${i.color ? 'background:'+i.color : ''}"></span></span>
-            <span class="mini-bar-label">${UI.esc(i.label)}</span>
-          </div>`;
-        }).join('') + `</div>`;
+        miniHtml = UI.miniViz(c.mini(r.data), c.miniStyle);
       }
 
-      const valueRow = c.vizReplacesValue && miniHtml
+      const isViz = c.vizReplacesValue && miniHtml;
+      // Trend chip: энгийн картад том тооны хажууд, viz картад гарчгийн мөрөнд
+      const valueRow = isViz
         ? ''
-        : `<div class="value"><span class="count" data-count="${val}">${UI.fmt(val)}</span>${c.unit ? ' <span class="unit">'+c.unit+'</span>' : ''}</div>`;
+        : `<div class="value-row"><div class="value"><span class="count" data-count="${val}">${UI.fmt(val)}</span>${c.unit ? ' <span class="unit">'+c.unit+'</span>' : ''}</div>${trendChip}</div>`;
       const wide = (c.viz && miniHtml) ? 'card-wide' : '';
+      const subTxt = c.sub(r.data);
       return `<div class="bezel card ${warn?'card-warn':''} ${featured} ${wide} ${fullRow}"><span class="tick-a"></span><span class="tick-b"></span>
-        <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span>${trendChip}</div>
+        <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span>${isViz ? trendChip : ''}</div>
         ${valueRow}
         ${miniHtml}
-        <div class="sub">${UI.esc(c.sub(r.data))}</div></div>`;
+        ${subTxt ? `<div class="sub">${UI.esc(subTxt)}</div>` : ''}</div>`;
     }).join('');
     UI.animateCounts(UI.$('#summaryCards'));
   }
@@ -790,8 +829,8 @@ const PageDashboard = () => {
     const n = CONFIG.num;
     const donut = UI.donutHtml([
       {label:'Шлам', value:n(d.sludge_ton), color:'var(--c-fuel)'},
-      {label:'Хаягдал', value:n(d.waste_ton)+n(d.short_waste_ton), color:'var(--c-issue)'},
-      {label:'Бүтээгдэхүүн', value:n(d.product_transport_ton), color:'var(--c-transport)'}
+      {label:'Хаягдал', value:n(d.waste_ton), color:'var(--c-issue)'},
+      {label:'Бүтээгдэхүүн', value:n(d.product_transport_ton)+n(d.short_waste_ton), color:'var(--c-transport)'}
     ], UI.fmt(n(d.sludge_ton)+n(d.waste_ton)+n(d.short_waste_ton)+n(d.product_transport_ton)), 'нийт тн');
     const donutBlock = donut ? `<div class="viz-block"><div class="viz-title">Тээврийн бүтэц — тонноор</div>${donut}</div>` : '';
     const rows = (d.vehicle_rows || [])
@@ -806,8 +845,8 @@ const PageDashboard = () => {
     return `
       <div class="fuel-calc detail-chips">
         <span>Шлам: <b>${UI.fmt(n(d.sludge_ton))} тн / ${UI.fmt(n(d.sludge_trips))} рейс</b></span>
-        <span>Хаягдал: <b>${UI.fmt(n(d.waste_ton)+n(d.short_waste_ton))} тн</b></span>
-        <span>Бүтээгдэхүүн: <b>${UI.fmt(n(d.product_transport_ton))} тн / ${UI.fmt(n(d.product_transport_trips))} рейс</b></span>
+        <span>Хаягдал: <b>${UI.fmt(n(d.waste_ton))} тн</b></span>
+        <span>Бүтээгдэхүүн: <b>${UI.fmt(n(d.product_transport_ton)+n(d.short_waste_ton))} тн / ${UI.fmt(n(d.product_transport_trips)+n(d.short_waste_trips))} рейс</b> <small>(богино ${UI.fmt(n(d.short_waste_ton))} тн)</small></span>
         <span>Пүү: <b>${UI.fmt(n(d.weighbridge_net_ton))} тн / ${UI.fmt(n(d.weighbridge_trips))} рейс</b></span>
       </div>
       ${donutBlock}
@@ -820,7 +859,9 @@ const PageDashboard = () => {
 
   async function loadMonthly(month){
     const box = UI.$('#monthlyCards');
+    const planArea = UI.$('#planArea');
     box.innerHTML = '<div class="module-empty">Ачаалж байна…</div>';
+    if(planArea) planArea.innerHTML = '<div class="module-empty">Ачаалж байна…</div>';
     try{
       const res = await API.monthly(month);
       const byType = {};
@@ -837,7 +878,8 @@ const PageDashboard = () => {
       const nowD = new Date();
       const ND = (my === nowD.getFullYear() && mm === nowD.getMonth() + 1) ? nowD.getDate() : dim;
       const mkSer = () => Array(ND).fill(0);
-      const ser = {inc:mkSer(), prod:mkSer(), trans:mkSer(), exp:mkSer(), hse:mkSer(), weigh:mkSer(), iss:mkSer()};
+      const ser = {inc:mkSer(), prod:mkSer(), trans:mkSer(), exp:mkSer(), hse:mkSer(),
+                   sludge:mkSer(), strips:mkSer(), ptrips:mkSer()};
       (res.reports||[]).forEach(r => {
         const day = parseInt((r.date||'').slice(8), 10);
         if(!day || day > ND) return;
@@ -850,10 +892,11 @@ const PageDashboard = () => {
         if(r.report_type === 'production') ser.prod[i] += CONFIG.num(d.shift_day_product_ton) + CONFIG.num(d.shift_night_product_ton);
         if(r.report_type === 'transport'){
           ser.trans[i] += CONFIG.num(d.sludge_ton) + CONFIG.num(d.waste_ton) + CONFIG.num(d.short_waste_ton) + CONFIG.num(d.product_transport_ton);
-          ser.weigh[i] += CONFIG.num(d.weighbridge_net_ton);
+          ser.sludge[i] += CONFIG.num(d.sludge_ton);
+          ser.strips[i] += CONFIG.num(d.sludge_trips);
+          ser.ptrips[i] += CONFIG.num(d.product_transport_trips);
         }
         if(r.report_type === 'hse') ser.hse[i] += CONFIG.num(d.hse_violation_count) + CONFIG.num(d.medical_assistance_count);
-        if(r.report_type === 'issue' && d.status === 'open') ser.iss[i] += 1;
       });
 
       // Pill баганан мини график: өдөр бүр нэг суваг, өгөгдөлтэй өдөр өнгөтэй
@@ -867,32 +910,104 @@ const PageDashboard = () => {
         <div class="m-days${dense}">` + arr.map((_, i) => `<span>${showLbl(i) ? i + 1 : ''}</span>`).join('') + `</div>`;
       };
 
-      const GREEN = 'var(--green)', RED = 'var(--brand)', AMBER = 'var(--c-transport)';
-      const cards = [
-        ['Түлшний орлого нийт', UI.fmt(fuelIncome)+' л', count('fuel')+' өдрийн тайлан', ser.inc, GREEN],
-        ['Бүтээгдэхүүн нийт', UI.fmt(sum('production','shift_day_product_ton')+sum('production','shift_night_product_ton'))+' тн', count('production')+' өдрийн тайлан', ser.prod, RED],
-        ['Тээвэр нийт', UI.fmt(sum('transport','sludge_ton')+sum('transport','waste_ton')+sum('transport','short_waste_ton')+sum('transport','product_transport_ton'))+' тн', count('transport')+' өдрийн тайлан', ser.trans, RED],
-        ['Түлшний зарлага нийт', UI.fmt((byType['fuel']||[]).reduce((a,r)=>a+(r.data.fuel_expense_liter!=null?CONFIG.num(r.data.fuel_expense_liter):CONFIG.num(r.data.fuel_truck_machine_liter)+CONFIG.num(r.data.fuel_truck_plant_liter)+CONFIG.num(r.data.reserve_tank_expense_liter)),0))+' л', count('fuel')+' өдрийн тайлан', ser.exp, RED],
-        ['ХАБ зөрчил / Эмнэлэг', UI.fmt(sum('hse','hse_violation_count'))+' / '+UI.fmt(sum('hse','medical_assistance_count')), count('hse')+' өдрийн тайлан', ser.hse, AMBER],
-        ['Пүүний нийт жин', UI.fmt(sum('transport','weighbridge_net_ton'))+' тн', 'тээврийн тайлангаас', ser.weigh, GREEN],
-        ['Нээлттэй асуудал', String(openIssues), count('issue')+' бүртгэл', ser.iss, AMBER]
-      ];
-      box.innerHTML = cards.map(c => `<div class="bezel card"><span class="tick-a"></span><span class="tick-b"></span>
-        <div class="card-tag-row"><span class="label">${UI.esc(c[0])}</span></div>
-        <div class="value">${UI.esc(c[1])}</div>
-        ${colsHtml(c[3], c[4])}
-        <div class="sub">${UI.esc(c[2])}</div></div>`).join('');
+      // Төлөвлөгөө татах — сэдэвчилсэн блокуудад цагирагаар харуулна
+      try{ currentPlan = (await API.plan(month)).plan || {}; }catch(e){ currentPlan = {}; }
 
-      // Бодит гүйцэтгэлийг хадгалж, төлөвлөгөөтэй харьцуулна
-      const actual = {
-        production_ton: sum('production','shift_day_product_ton') + sum('production','shift_night_product_ton'),
-        sludge_ton: sum('transport','sludge_ton'),
-        sludge_trips: sum('transport','sludge_trips'),
-        product_transport_ton: sum('transport','product_transport_ton'),
-        product_transport_trips: sum('transport','product_transport_trips'),
-        fuel_expense_liter: (byType['fuel']||[]).reduce((a,r)=>a+(r.data.fuel_expense_liter!=null?CONFIG.num(r.data.fuel_expense_liter):CONFIG.num(r.data.fuel_truck_machine_liter)+CONFIG.num(r.data.fuel_truck_plant_liter)+CONFIG.num(r.data.reserve_tank_expense_liter)),0)
+      const fuelExpense = (byType['fuel']||[]).reduce((a,r)=>a+(r.data.fuel_expense_liter!=null?CONFIG.num(r.data.fuel_expense_liter):CONFIG.num(r.data.fuel_truck_machine_liter)+CONFIG.num(r.data.fuel_truck_plant_liter)+CONFIG.num(r.data.reserve_tank_expense_liter)),0);
+      const prodTon = sum('production','shift_day_product_ton') + sum('production','shift_night_product_ton');
+      const transTotal = sum('transport','sludge_ton')+sum('transport','waste_ton')+sum('transport','short_waste_ton')+sum('transport','product_transport_ton');
+      const sludgeTon = sum('transport','sludge_ton');
+      const sludgeTrips = sum('transport','sludge_trips');
+      const prodTrips = sum('transport','product_transport_trips');
+      const weigh = sum('transport','weighbridge_net_ton');
+      const hseV = sum('hse','hse_violation_count'), hseM = sum('hse','medical_assistance_count');
+
+      const elapsed = monthElapsedFrac(month);
+      const paceLeft = Math.round(elapsed * 100);
+      const isAdmin = (SESSION.get() || {}).role === 'admin';
+      const n = CONFIG.num;
+
+      /* ---------- ХЭСЭГ 1: Сарын төлөвлөгөөний биелэлт ---------- */
+      // Статус: сарын явцтай харьцуулсан зөрүүг текстээр (Түрүүлсэн +7% г.м.)
+      const plStatus = (pct, planV) => {
+        if(!(planV > 0)) return {tone:'mid', txt:'Төлөвлөгөө оруулаагүй'};
+        if(elapsed <= 0) return {tone:'mid', txt:'Сар эхлээгүй'};
+        const diff = pct - paceLeft;
+        if(diff >= 0) return {tone:'good', txt:'Түрүүлсэн +' + diff + '%'};
+        if(diff >= -20) return {tone:'mid', txt:'Ойролцоо ' + diff + '%'};
+        return {tone:'low', txt:'Хоцорсон ' + diff + '%'};
       };
-      renderPlanVsActual(month, actual);
+      const plCard = (title, act, planV, unit, veh, dailyArr, color) => {
+        const pct = planV > 0 ? Math.round((act / planV) * 100) : 0;
+        const s = plStatus(pct, planV);
+        return `<div class="pl-card">
+          <div class="pl-top"><span class="pl-name">${UI.esc(title)}</span><span class="pl-pct t-${s.tone}">${planV > 0 ? pct + '%' : '—'}</span></div>
+          <div class="pl-nums"><b class="count" data-count="${act}">${UI.fmt(act)}</b><span>/ ${planV > 0 ? UI.fmt(planV) : '—'} ${unit}</span></div>
+          <div class="pl-bar"><span class="pl-fill f-${s.tone}" style="width:${Math.min(pct, 100)}%"></span>${elapsed > 0 && elapsed < 1 ? `<span class="pl-pace" style="left:${paceLeft}%" title="Сарын явц ${paceLeft}%"></span>` : ''}</div>
+          <div class="pl-foot"><span>Өнөөдрийн зорилт · <b>${planV > 0 ? UI.fmt(Math.round(planV * elapsed)) : '—'}</b> ${unit}</span><span class="pl-status s-${s.tone}">${s.txt}</span></div>
+          ${dailyArr ? colsHtml(dailyArr, color) : ''}
+          ${veh ? `<div class="pl-note">Ажиллаж буй: ${UI.fmt(veh)} машин</div>` : ''}
+        </div>`;
+      };
+
+      if(planArea){
+        planArea.innerHTML = `
+          <div class="pl-toolbar">
+            <div class="lg-chips">
+              <span class="lg-chip lg-good">● Түрүүлсэн</span>
+              <span class="lg-chip lg-mid">● Ойролцоо</span>
+              <span class="lg-chip lg-low">● Хоцорсон</span>
+            </div>
+            <div class="pl-tools">
+              <span class="mp-pill">Сарын явц <span class="mp-track"><span class="mp-fill" style="width:${paceLeft}%"></span></span> <b>${paceLeft}%</b></span>
+              ${isAdmin ? '<button id="editPlanBtn" class="btn btn-soft">Төлөвлөгөө засах</button>' : ''}
+            </div>
+          </div>
+          <div id="planEditorBox" class="hidden"></div>
+          <div class="pl-grid">
+            ${plCard('Бүтээгдэхүүн үйлдвэрлэлт', prodTon, n(currentPlan.production_ton), 'тн', 0, ser.prod, 'var(--c-production)')}
+            ${plCard('Хаягдал', sludgeTon, n(currentPlan.sludge_ton), 'тн', 0, ser.sludge, 'var(--c-fuel)')}
+            ${plCard('Шлам', sludgeTrips, n(currentPlan.sludge_trips), 'рейс', n(currentPlan.sludge_vehicles), ser.strips, 'var(--c-equipment)')}
+            ${plCard('Бүтээгдэхүүн', prodTrips, n(currentPlan.product_transport_trips), 'рейс', n(currentPlan.product_transport_vehicles), ser.ptrips, 'var(--c-transport)')}
+          </div>`;
+        UI.animateCounts(planArea);
+        if(isAdmin){ const b = UI.$('#editPlanBtn'); if(b) b.onclick = () => renderPlanEditor(month); }
+      }
+
+      /* ---------- ХЭСЭГ 2: Сарын нэгтгэл (төлөвлөгөөнд ороогүй үзүүлэлтүүд) ---------- */
+      const statItem = (title, valTxt, unit, dailyArr, color, subTxt) => `<div class="g-item g-stat"><div class="g-info">
+        <div class="g-name">${UI.esc(title)}</div>
+        <div class="g-nums"><b>${valTxt}</b><span class="plan-target">${unit}</span></div>
+        ${dailyArr ? colsHtml(dailyArr, color) : ''}
+        ${subTxt ? `<div class="plan-foot">${UI.esc(subTxt)}</div>` : ''}
+      </div></div>`;
+      const typeIcon = k => { const t = CONFIG.reportTypes.find(x => x.key === k); return t ? `<span class="mchip" style="background:${t.color}">${t.icon}</span>` : ''; };
+
+      box.innerHTML = `
+        <div class="theme-grid theme-grid-3">
+          <div class="theme-block">
+            <div class="tb-head">${typeIcon('fuel')}<b>Түлш</b></div>
+            ${statItem('Орлого нийт', UI.fmt(fuelIncome), 'л', ser.inc, 'var(--green)')}
+            ${statItem('Зарлага нийт', UI.fmt(fuelExpense), 'л', ser.exp, 'var(--brand)', count('fuel') + ' өдрийн тайлан')}
+          </div>
+          <div class="theme-block">
+            <div class="tb-head">${typeIcon('transport')}<b>Тээвэр</b></div>
+            ${statItem('Тээвэр нийт', UI.fmt(transTotal), 'тн', ser.trans, 'var(--c-transport)', count('transport') + ' өдрийн тайлан')}
+            ${statItem('Пүүний нийт жин (ER-ээс ирсэн шлам)', UI.fmt(weigh), 'тн', null, null, 'пүүний хэмжилтээр')}
+          </div>
+          <div class="theme-block">
+            <div class="tb-head">${typeIcon('hse')}<b>ХАБЭА ба Асуудал</b></div>
+            <div class="kpi-chips" style="margin-top:2px">
+              <span class="kpi-chip ${hseV ? 'bad' : 'ok'}">Зөрчил ${UI.fmt(hseV)}</span>
+              <span class="kpi-chip ${hseM ? 'mid' : 'ok'}">Эмнэлэг ${UI.fmt(hseM)}</span>
+              <span class="kpi-chip ${openIssues ? 'bad' : 'ok'}">Нээлттэй асуудал ${openIssues}</span>
+            </div>
+            ${colsHtml(ser.hse, 'var(--c-transport)')}
+            <div class="plan-foot tb-foot">${count('hse')} ХАБ · ${count('issue')} асуудлын бүртгэл</div>
+          </div>
+        </div>`;
+      UI.animateCounts(box);
+
       renderMonthlyMachines(byType);
     }catch(err){
       box.innerHTML = `<div class="module-empty">${UI.esc(err.message)}</div>`;
@@ -904,12 +1019,11 @@ const PageDashboard = () => {
   // Бүтээгдэхүүн тээвэрлэлт /машин, рейс/ · Шлам тээвэрлэлт /машин, рейс/
   const PLAN_METRICS = [
     {key:'production_ton', label:'Бүтээгдэхүүн үйлдвэрлэлт', unit:'тн'},
-    {key:'sludge_ton', label:'Шлам олборлолт', unit:'тн'},
-    {key:'product_transport_trips', label:'Бүтээгдэхүүн тээвэрлэлт', unit:'рейс', vehiclesKey:'product_transport_vehicles'},
-    {key:'sludge_trips', label:'Шлам тээвэрлэлт', unit:'рейс', vehiclesKey:'sludge_vehicles'}
+    {key:'sludge_ton', label:'Хаягдал', unit:'тн'},
+    {key:'product_transport_trips', label:'Бүтээгдэхүүн', unit:'рейс', vehiclesKey:'product_transport_vehicles'},
+    {key:'sludge_trips', label:'Шлам', unit:'рейс', vehiclesKey:'sludge_vehicles'}
   ];
   let currentPlan = {};
-  let currentActual = {};
 
   /** Сарын явц: харагдаж буй сар өнгөрсөн бол 1, ирээдүйн сар бол 0, энэ сар бол өдрийн харьцаа */
   function monthElapsedFrac(month){
@@ -923,117 +1037,29 @@ const PageDashboard = () => {
     return new Date(yy, mm - 1, 1) < now ? 1 : 0;
   }
 
-  async function renderPlanVsActual(month, actual){
-    currentActual = actual;
-    const box = UI.$('#planSection');
-    if(!box) return;
-    try{
-      const res = await API.plan(month);
-      currentPlan = res.plan || {};
-    }catch(e){ currentPlan = {}; }
-
-    const isAdmin = (SESSION.get() || {}).role === 'admin';
-    const elapsed = monthElapsedFrac(month);
-    const paceLeft = Math.round(elapsed * 100);
-
-    // Activity ring: биелэлтийг цагирагаар, өнөөдрийн явцыг цагираг дээрх зураасаар
-    let ringId = 0;
-    const ring = (pct, tone, paceFrac) => {
-      const R = 40, C = 2 * Math.PI * R;
-      const fill = pct === null ? 0 : Math.min(pct, 100) / 100;
-      const colors = tone === 'plan-good' ? ['#5AD97C', '#28B14C']
-                   : tone === 'plan-low'  ? ['#FF8A7A', '#E44332']
-                   : ['#FFCF4D', '#F5920B'];
-      const gid = 'prg' + (++ringId) + month.replace('-', '');
-      let pace = '';
-      if(paceFrac > 0 && paceFrac < 1){
-        const a = paceFrac * 2 * Math.PI - Math.PI / 2;
-        const x1 = 50 + 33 * Math.cos(a), y1 = 50 + 33 * Math.sin(a);
-        const x2 = 50 + 47 * Math.cos(a), y2 = 50 + 47 * Math.sin(a);
-        pace = `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}" class="plan-ring-pace"/>`;
-      }
-      const pctText = pct === null ? '—' : (pct > 999 ? '>999%' : pct + '%');
-      return `<div class="plan-ring">
-        <svg viewBox="0 0 100 100">
-          <defs><linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="1">
-            <stop offset="0%" stop-color="${colors[0]}"/><stop offset="100%" stop-color="${colors[1]}"/>
-          </linearGradient></defs>
-          <circle cx="50" cy="50" r="${R}" fill="none" class="plan-ring-track" stroke-width="9"/>
-          ${fill > 0 ? `<circle cx="50" cy="50" r="${R}" fill="none" stroke="url(#${gid})" stroke-width="9" stroke-linecap="round"
-            stroke-dasharray="${(fill * C).toFixed(1)} ${C.toFixed(1)}" transform="rotate(-90 50 50)" class="plan-ring-fill"/>` : ''}
-          ${pace}
-        </svg>
-        <div class="plan-ring-center"><b class="${tone}">${pctText}</b></div>
-      </div>`;
-    };
-
-    const cards = PLAN_METRICS.map(m => {
-      const plan = CONFIG.num(currentPlan[m.key]);
-      const act = CONFIG.num(actual[m.key]);
-      const vehicles = m.vehiclesKey ? CONFIG.num(currentPlan[m.vehiclesKey]) : 0;
-      const hasPlan = plan > 0;
-      const pct = hasPlan ? Math.round((act / plan) * 100) : null;
-      // Үнэлгээг сарын бүтэн дүнгээр бус ӨНӨӨДРИЙН явцтай харьцуулж өгнө —
-      // сарын дундуур 40% биелэлт "муу" биш, явцаасаа түрүүлж байвал ногоон.
-      const paceTarget = hasPlan ? plan * elapsed : 0;
-      let tone = '';
-      if(hasPlan){
-        if(paceTarget <= 0) tone = 'plan-mid';
-        else if(act >= paceTarget) tone = 'plan-good';
-        else if(act >= paceTarget * 0.8) tone = 'plan-mid';
-        else tone = 'plan-low';
-      }
-      const showPace = hasPlan && elapsed > 0 && elapsed < 1;
-      const foot = !hasPlan
-        ? 'Төлөвлөгөө оруулаагүй'
-        : showPace
-          ? `Сарын явц ${paceLeft}% · Өнөөдрийн зорилт ${UI.fmt(Math.round(paceTarget))} ${m.unit}`
-          : (elapsed >= 1 ? 'Сар дууссан — эцсийн гүйцэтгэл' : 'Сар эхлээгүй');
-      return `<div class="plan-card">
-        ${ring(pct, tone || 'plan-mid', showPace ? elapsed : 0)}
-        <div class="plan-info">
-          <div class="plan-name">${UI.esc(m.label)}${vehicles ? `<span class="plan-veh">${UI.fmt(vehicles)} машин</span>` : ''}</div>
-          <div class="plan-card-nums"><b class="count" data-count="${act}">${UI.fmt(act)}</b><span class="plan-target">/ ${hasPlan ? UI.fmt(plan) : '—'} ${m.unit}</span></div>
-          <div class="plan-foot">${foot}</div>
-        </div>
-      </div>`;
-    }).join('');
-
-    box.innerHTML = `<section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
-      <div class="panel-head">
-        <div><h3>Сарын төлөвлөгөө — гүйцэтгэл</h3><p>Компанийн сарын төлөвлөгөөний биелэлт. Цагираг дээрх зураас нь өнөөдрийн явцын түвшин.</p></div>
-        ${isAdmin ? '<button class="btn btn-soft" id="editPlanBtn">Төлөвлөгөө засах</button>' : ''}
-      </div>
-      <div id="planBody" class="plan-grid">${cards}</div>
-    </section>`;
-    UI.animateCounts(UI.$('#planBody'));
-
-    if(isAdmin){
-      UI.$('#editPlanBtn').onclick = () => renderPlanEditor(month);
-    }
-  }
-
+  /** Төлөвлөгөө засах — биелэлтийн хэсгийн дээр нээгддэг form */
   function renderPlanEditor(month){
-    const body = UI.$('#planBody');
-    if(!body) return;
-    body.classList.remove('plan-grid');
-    body.innerHTML = PLAN_METRICS.map(m => `<div class="plan-edit-row">
+    const box = UI.$('#planEditorBox');
+    if(!box) return;
+    box.classList.remove('hidden');
+    box.innerHTML = `<div class="user-form">` + PLAN_METRICS.map(m => `<div class="user-form-row">
       <label>${UI.esc(m.label)} (${m.unit})</label>
       <input type="number" step="any" min="0" data-key="${m.key}" value="${currentPlan[m.key] ?? ''}" placeholder="Төлөвлөгөө оруулах">
-    </div>` + (m.vehiclesKey ? `<div class="plan-edit-row plan-edit-sub">
+    </div>` + (m.vehiclesKey ? `<div class="user-form-row">
       <label>${UI.esc(m.label)} — машины тоо</label>
       <input type="number" step="1" min="0" data-key="${m.vehiclesKey}" value="${currentPlan[m.vehiclesKey] ?? ''}" placeholder="машин">
     </div>` : '')).join('') +
-    `<div class="form-actions"><button class="btn btn-soft" id="cancelPlanBtn">Болих</button><button class="btn btn-primary" id="savePlanBtn">Хадгалах</button></div>`;
+    `<div class="form-actions"><button type="button" class="btn btn-soft" id="cancelPlanBtn">Болих</button><button type="button" class="btn btn-primary" id="savePlanBtn">Хадгалах</button></div></div>`;
+    box.scrollIntoView({behavior:'smooth', block:'center'});
 
-    UI.$('#cancelPlanBtn').onclick = () => renderPlanVsActual(month, currentActual);
+    UI.$('#cancelPlanBtn').onclick = () => { box.innerHTML = ''; box.classList.add('hidden'); };
     UI.$('#savePlanBtn').onclick = async () => {
       const plan = {};
-      UI.$$('[data-key]', body).forEach(inp => { if(inp.value !== '') plan[inp.dataset.key] = parseFloat(inp.value); });
+      UI.$$('[data-key]', box).forEach(inp => { if(inp.value !== '') plan[inp.dataset.key] = parseFloat(inp.value); });
       try{
         await API.planSave(month, plan);
         currentPlan = plan;
-        renderPlanVsActual(month, currentActual);
+        loadMonthly(month);
       }catch(err){ alert(err.message); }
     };
   }
@@ -1061,15 +1087,54 @@ const PageDashboard = () => {
       .sort((a,b) => b.liter - a.liter);
     if(!list.length){ box.innerHTML = ''; return; }
 
-    // Wave график: өмчлөлийн бүлэг тус бүрээр машин бүрийн түлш зарцуулалт
-    const waveBlocks = CONFIG.OWNERSHIP_ORDER.map(o => {
-      const points = list.filter(a => a.ownership === o.key && a.liter > 0)
-        .map(a => ({label: a.name, value: a.liter}));
-      if(!points.length) return '';
-      const color = o.color.startsWith('var') ? getComputedStyle(document.documentElement).getPropertyValue(o.color.slice(4,-1)).trim() || '#BC2029' : o.color;
-      return `<div class="viz-block"><div class="viz-title"><span class="own-dot" style="background:${o.color};display:inline-block;width:9px;height:9px;border-radius:50%;margin-right:6px"></span>${UI.esc(o.label)} — түлш зарцуулалт / л</div>${UI.waveChartHtml(points, color)}</div>`;
+    // Өмчлөлийн бүлгүүдийн өнгө (статусын ногоон/улаантай андуурагдахгүй палитр)
+    const GM = {
+      own:            {label:'Өөрийн',                 color:'#3D4A63', bg:'rgba(61,74,99,.1)'},
+      rental_product: {label:'Бүтээгдэхүүний түрээс',  color:'#D97A16', bg:'rgba(217,122,22,.12)'},
+      rental_sludge:  {label:'Шламын түрээс',          color:'#1F8FA3', bg:'rgba(31,143,163,.12)'}
+    };
+    const gm = o => GM[o] || {label:'Бусад', color:'var(--ink-3)', bg:'rgba(60,60,80,.08)'};
+    const initials = name => (String(name).replace(/[^A-Za-zА-ЯӨҮЁа-яөүё0-9]/g, '').slice(0, 2) || '•').toUpperCase();
+
+    // Үр бүтээмж: түлш ба тонн хоёулаа бүртгэгдсэн машид л/тонн бодогдоно
+    const effList = list.filter(a => a.liter > 0 && a.ton > 0).map(a => ({...a, eff: a.liter / a.ton}));
+    const best = effList.length ? Math.min(...effList.map(e => e.eff)) : null;
+    const worst = effList.length > 1 ? Math.max(...effList.map(e => e.eff)) : null;
+
+    // Зүүн карт: л/тонн эрэмбэ (шилдэг нь дээрээ, ихдээ 10)
+    const rankAll = effList.slice().sort((a,b) => a.eff - b.eff);
+    const rank = rankAll.slice(0, 10);
+    const rankMax = rankAll.length ? rankAll[rankAll.length - 1].eff * 1.08 : 1;
+    const rankRows = rank.map(e => `<div class="eff-row">
+      <div class="eff-row-top"><span class="eff-nm">${UI.esc(e.name)}${e.eff === best ? ' ★' : ''}</span><span class="eff-badge">${e.eff.toFixed(2)}</span></div>
+      <div class="eff-track"><span class="eff-fill" style="width:${Math.max(e.eff / rankMax * 100, 3).toFixed(1)}%;background:${gm(e.ownership).color}"></span></div>
+    </div>`).join('');
+    const legend = CONFIG.OWNERSHIP_ORDER.map(o => {
+      const g = gm(o.key);
+      return `<span class="lg-chip" style="background:${g.bg};color:${g.color}">● ${g.label}</span>`;
     }).join('');
 
+    // Баруун карт: машин бүр өмчлөлийн бүлгээрээ, шилдэг нь онцлогдоно
+    const order = ['own', 'rental_product', 'rental_sludge'];
+    const machRows = effList.slice()
+      .sort((a,b) => (order.indexOf(a.ownership) - order.indexOf(b.ownership)) || (a.eff - b.eff))
+      .map(e => {
+        const g = gm(e.ownership);
+        const effColor = e.eff === best ? '#2E9E52' : (e.eff === worst ? 'var(--warn)' : 'var(--ink)');
+        return `<div class="mach-card${e.eff === best ? ' mach-best' : ''}">
+          <div class="mach-ava" style="background:${g.color}">${UI.esc(initials(e.name))}</div>
+          <div class="mach-info">
+            <div class="mach-nm">${UI.esc(e.name)}
+              <span class="mach-pill" style="background:${g.bg};color:${g.color}">${g.label}</span>
+              ${e.eff === best ? '<span class="mach-pill mach-star">★ Шилдэг</span>' : ''}
+            </div>
+            <div class="mach-sub">${UI.fmt(e.liter)} л · ${UI.fmt(e.trips)} рейс · ${UI.fmt(e.ton)} тн</div>
+          </div>
+          <div class="mach-eff"><b style="color:${effColor}">${e.eff.toFixed(2)}</b><small>л/тонн</small></div>
+        </div>`;
+      }).join('');
+
+    // Бүрэн хүснэгт (тонгүй туслах машинууд ч багтана)
     const rows = list.map(a => {
       const lpt = (a.ton && a.liter) ? (a.liter / a.ton) : null;
       return `<tr>
@@ -1082,10 +1147,21 @@ const PageDashboard = () => {
     }).join('');
 
     box.innerHTML = `<section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
-      <div class="panel-head"><div><h3>Машин тус бүрийн үр ашиг</h3>
-      <p>Сарын нийт түлш (шлам + бүтээгдэхүүн бүх тээвэр нэгтгэсэн), 1 тонн тутамд зарцуулсан литр.</p></div></div>
-      ${waveBlocks}
-      <div class="table-wrap"><table class="table">
+      <div class="panel-head"><div><h3>Машин тус бүрийн үр бүтээмж</h3>
+      <p>л/тонн — 1 тонн тутамд зарцуулсан түлш. Бага байх нь сайн.</p></div></div>
+      ${effList.length ? `<div class="eff-grid">
+        <div class="eff-card">
+          <div class="eff-card-head"><b>Түлшний зарцуулалт</b><span class="eff-tag">л/тонн</span></div>
+          <div class="eff-card-sub">Бага утга = өндөр үр бүтээмж${rankAll.length > 10 ? ' · шилдэг 10' : ''}</div>
+          <div class="eff-rank">${rankRows}</div>
+          <div class="lg-chips" style="margin-top:16px">${legend}</div>
+        </div>
+        <div class="eff-card">
+          <div class="eff-card-head"><b>Машины жагсаалт</b><span class="eff-tag">${effList.length} машин</span></div>
+          <div class="mach-list">${machRows}</div>
+        </div>
+      </div>` : ''}
+      <div class="table-wrap" style="margin-top:14px"><table class="table">
         <thead><tr><th>Машин</th><th>Түлш / л</th><th>Рейс</th><th>Тонн</th><th>л/тонн</th></tr></thead>
         <tbody>${rows}</tbody>
       </table></div>
@@ -1334,7 +1410,8 @@ const PageReport = () => {
     const t = CONFIG.transportTotals(collectTransportRows(form));
     box.innerHTML = `<div class="fuel-calc">
       <span>Шлам: <b>${UI.fmt(t.sludge_ton)} тн / ${UI.fmt(t.sludge_trips)} рейс</b></span>
-      <span>Хаягдал: <b>${UI.fmt(t.waste_ton + t.short_waste_ton)} тн</b></span>
+      <span>Хаягдал: <b>${UI.fmt(t.waste_ton)} тн</b></span>
+      <span>Богино: <b>${UI.fmt(t.short_waste_ton)} тн</b></span>
       <span>Бүтээгдэхүүн: <b>${UI.fmt(t.product_transport_ton)} тн / ${UI.fmt(t.product_transport_trips)} рейс</b></span>
     </div>`;
   }
@@ -1435,7 +1512,8 @@ const PageReport = () => {
 };
 
 /* ================================================================
-   PAGE: ADMIN — хэрэглэгчийн удирдлага (PIN солих)
+   PAGE: ADMIN — хэрэглэгчийн удирдлага
+   (нэмэх, нэр солих, нууц үг солих, идэвхгүй болгох)
    ================================================================ */
 const PageAdmin = () => {
   UI.paintUserChrome();
@@ -1445,10 +1523,18 @@ const PageAdmin = () => {
 
   const box = UI.$('#userList');
   const msg = UI.$('#adminMessage');
+  const addBox = UI.$('#userAddBox');
+  const addBtn = UI.$('#userAddBtn');
   if(!box) return;
 
   const ROLE_LABELS = {admin:'Админ', worker:'Ажилтан', viewer:'Захирал / үзэгч'};
   let USERS = [];
+
+  const permName = k => { const t = CONFIG.reportTypes.find(r => r.key === k); return t ? t.name : k; };
+  const kickIfExpired = err => {
+    if(/нэвтрэлт хүчингүй/i.test(err.message)){ SESSION.clear(); location.href = 'index.html'; return true; }
+    return false;
+  };
 
   async function load(){
     box.innerHTML = '<div class="module-empty">Ачаалж байна…</div>';
@@ -1459,59 +1545,167 @@ const PageAdmin = () => {
     }catch(err){ box.innerHTML = `<div class="module-empty">${UI.esc(err.message)}</div>`; }
   }
 
+  /* ---------- Шинэ хэрэглэгч нэмэх form ---------- */
+  function renderAddForm(){
+    if(!addBox) return;
+    addBox.innerHTML = `<div class="user-form">
+      <div class="user-form-row">
+        <label>Нэвтрэх нэр <small>(латин, 3-20)</small></label>
+        <input id="uNewUsername" type="text" maxlength="20" placeholder="жишээ: teever2" autocomplete="off">
+      </div>
+      <div class="user-form-row">
+        <label>Ажилтны нэр</label>
+        <input id="uNewName" type="text" maxlength="60" placeholder="жишээ: Тээвэр Ууганбаяр">
+      </div>
+      <div class="user-form-row">
+        <label>Нууц үг <small>(4-20 тэмдэгт)</small></label>
+        <input id="uNewPw" type="password" maxlength="20" placeholder="Нууц үг" autocomplete="new-password">
+      </div>
+      <div class="user-form-row user-form-perms">
+        <label>Ямар тайлан оруулах вэ?</label>
+        <div class="perm-chips">${CONFIG.reportTypes.map(t =>
+          `<label class="perm-chip"><input type="checkbox" value="${t.key}"><span>${UI.esc(t.name)}</span></label>`
+        ).join('')}</div>
+      </div>
+      <div class="form-actions">
+        <button type="button" class="btn btn-soft" id="uNewCancel">Болих</button>
+        <button type="button" class="btn btn-primary" id="uNewSave">Бүртгэх</button>
+      </div>
+    </div>`;
+    addBox.classList.remove('hidden');
+    UI.$('#uNewCancel').onclick = () => { addBox.innerHTML = ''; addBox.classList.add('hidden'); };
+    UI.$('#uNewSave').onclick = async () => {
+      const username = UI.$('#uNewUsername').value.trim();
+      const name = UI.$('#uNewName').value.trim();
+      const pw = UI.$('#uNewPw').value.trim();
+      const perms = UI.$$('.perm-chips input:checked', addBox).map(i => i.value);
+      if(!/^[a-zA-Z0-9_.-]{3,20}$/.test(username)){ UI.alertBox(msg, 'Нэвтрэх нэр 3-20 тэмдэгт: латин үсэг, тоо, _ . - байна.'); return; }
+      if(!name){ UI.alertBox(msg, 'Ажилтны нэрийг оруулна уу (жишээ: Тээвэр Ууганбаяр).'); return; }
+      if(!/^\S{4,20}$/.test(pw)){ UI.alertBox(msg, 'Нууц үг 4-20 тэмдэгт байх ёстой (хоосон зайгүй).'); return; }
+      if(!perms.length){ UI.alertBox(msg, 'Дор хаяж нэг тайлангийн эрх сонгоно уу.'); return; }
+      try{
+        const res = await API.userCreate(username, name, pw, perms);
+        USERS = res.users || USERS;
+        addBox.innerHTML = ''; addBox.classList.add('hidden');
+        render();
+        UI.alertBox(msg, `«${username}» хэрэглэгч амжилттай бүртгэгдлээ.`, true);
+      }catch(err){ if(!kickIfExpired(err)) UI.alertBox(msg, err.message); }
+    };
+  }
+  if(addBtn) addBtn.onclick = () => renderAddForm();
+
+  /* ---------- Хэрэглэгчийн хүснэгт ---------- */
   function render(){
     box.innerHTML = `<div class="table-wrap"><table class="table">
-      <thead><tr><th>Нэвтрэх нэр</th><th>Нэр</th><th>Эрх</th><th>Төлөв</th><th class="right">PIN</th></tr></thead>
-      <tbody>` + USERS.map(u => `<tr data-uid="${u.id}">
+      <thead><tr><th>Нэвтрэх нэр</th><th>Ажилтны нэр</th><th>Эрх</th><th>Төлөв</th><th class="right">Үйлдэл</th></tr></thead>
+      <tbody>` + USERS.map(u => {
+        const permsTxt = u.role === 'admin' ? 'Бүх эрх' :
+          (u.permissions && u.permissions.length ? u.permissions.map(permName).join(', ') : '—');
+        return `<tr data-uid="${u.id}" class="${u.active ? '' : 'user-inactive'}">
         <td><b>${UI.esc(u.username)}</b></td>
         <td>${UI.esc(u.name || '—')}</td>
-        <td>${UI.esc(ROLE_LABELS[u.role] || u.role)}${u.department ? ' · ' + UI.esc(u.department) : ''}</td>
+        <td>${UI.esc(ROLE_LABELS[u.role] || u.role)} · ${UI.esc(permsTxt)}</td>
         <td>${u.active ? '<span class="pin-badge pin-on">Идэвхтэй</span>' : '<span class="pin-badge pin-off">Идэвхгүй</span>'}</td>
         <td class="right">
-          <span class="pin-edit hidden">
-            <input class="pin-input" type="password" inputmode="numeric" maxlength="8" placeholder="Шинэ PIN" autocomplete="new-password">
-            <button type="button" class="btn btn-primary btn-sm pin-save">Хадгалах</button>
-            <button type="button" class="btn btn-soft btn-sm pin-cancel">Болих</button>
+          <span class="pw-edit hidden">
+            <input class="pw-input" type="password" maxlength="20" placeholder="Шинэ нууц үг" autocomplete="new-password">
+            <button type="button" class="btn btn-primary btn-sm pw-save">Хадгалах</button>
+            <button type="button" class="btn btn-soft btn-sm pw-cancel">Болих</button>
           </span>
-          <button type="button" class="btn btn-soft btn-sm pin-toggle">PIN солих</button>
+          <span class="rn-edit hidden">
+            <input class="rn-user" type="text" maxlength="20" placeholder="Нэвтрэх нэр" value="${UI.esc(u.username)}">
+            <input class="rn-name" type="text" maxlength="60" placeholder="Ажилтны нэр" value="${UI.esc(u.name || '')}">
+            <button type="button" class="btn btn-primary btn-sm rn-save">Хадгалах</button>
+            <button type="button" class="btn btn-soft btn-sm rn-cancel">Болих</button>
+          </span>
+          <span class="row-actions">
+            <button type="button" class="btn btn-soft btn-sm rn-toggle">Нэр солих</button>
+            <button type="button" class="btn btn-soft btn-sm pw-toggle">Нууц үг</button>
+            ${u.username === session.username ? '' :
+              `<button type="button" class="btn btn-soft btn-sm act-toggle">${u.active ? 'Идэвхгүй болгох' : 'Идэвхжүүлэх'}</button>`}
+          </span>
         </td>
-      </tr>`).join('') + `</tbody></table></div>`;
+      </tr>`; }).join('') + `</tbody></table></div>`;
 
-    UI.$$('.pin-toggle', box).forEach(btn => btn.onclick = () => {
+    UI.$$('.pw-toggle', box).forEach(btn => btn.onclick = () => {
       const tr = btn.closest('tr');
-      btn.classList.add('hidden');
-      tr.querySelector('.pin-edit').classList.remove('hidden');
-      tr.querySelector('.pin-input').focus();
+      tr.querySelector('.row-actions').classList.add('hidden');
+      tr.querySelector('.pw-edit').classList.remove('hidden');
+      tr.querySelector('.pw-input').focus();
     });
-    UI.$$('.pin-cancel', box).forEach(btn => btn.onclick = () => render());
-    UI.$$('.pin-save', box).forEach(btn => btn.onclick = () => savePin(btn));
-    UI.$$('.pin-input', box).forEach(inp => inp.addEventListener('keydown', e => {
-      if(e.key === 'Enter'){ e.preventDefault(); savePin(inp); }
+    UI.$$('.rn-toggle', box).forEach(btn => btn.onclick = () => {
+      const tr = btn.closest('tr');
+      tr.querySelector('.row-actions').classList.add('hidden');
+      tr.querySelector('.rn-edit').classList.remove('hidden');
+      tr.querySelector('.rn-user').focus();
+    });
+    UI.$$('.pw-cancel, .rn-cancel', box).forEach(btn => btn.onclick = () => render());
+    UI.$$('.pw-save', box).forEach(btn => btn.onclick = () => savePw(btn));
+    UI.$$('.rn-save', box).forEach(btn => btn.onclick = () => saveRename(btn));
+    UI.$$('.act-toggle', box).forEach(btn => btn.onclick = () => toggleActive(btn));
+    UI.$$('.pw-input', box).forEach(inp => inp.addEventListener('keydown', e => {
+      if(e.key === 'Enter'){ e.preventDefault(); savePw(inp); }
     }));
   }
 
-  async function savePin(el){
+  async function savePw(el){
     const tr = el.closest('tr');
     const uid = tr.dataset.uid;
-    const inp = tr.querySelector('.pin-input');
-    const pin = inp.value.trim();
-    if(!/^\d{4,8}$/.test(pin)){ UI.alertBox(msg, 'PIN 4-8 оронтой тоо байх ёстой.'); inp.focus(); return; }
+    const pw = tr.querySelector('.pw-input').value.trim();
+    if(!/^\S{4,20}$/.test(pw)){ UI.alertBox(msg, 'Нууц үг 4-20 тэмдэгт байх ёстой (хоосон зайгүй).'); return; }
     const target = USERS.find(u => String(u.id) === String(uid));
-    if(!confirm(`«${target ? target.username : uid}» хэрэглэгчийн PIN-ийг солих уу?`)) return;
+    if(!confirm(`«${target ? target.username : uid}» хэрэглэгчийн нууц үгийг солих уу?`)) return;
     try{
-      const res = await API.userSetPin(uid, pin);
+      const res = await API.userSetPin(uid, pw);
       USERS = res.users || USERS;
-      // Админ ӨӨРИЙН PIN-ээ сольсон бол одоогийн session хүчингүй болно — дахин нэвтрүүлнэ
       if(target && target.username === session.username){
-        alert('Та өөрийн PIN-ээ сольсон тул шинэ PIN-ээрээ дахин нэвтэрнэ үү.');
+        alert('Та өөрийн нууц үгээ сольсон тул шинэ нууц үгээрээ дахин нэвтэрнэ үү.');
         SESSION.clear(); location.href = 'index.html'; return;
       }
       render();
-      UI.alertBox(msg, `«${target ? target.username : ''}» хэрэглэгчийн PIN амжилттай солигдлоо.`, true);
-    }catch(err){
-      if(/нэвтрэлт хүчингүй/i.test(err.message)){ SESSION.clear(); location.href = 'index.html'; return; }
-      UI.alertBox(msg, err.message);
-    }
+      UI.alertBox(msg, `«${target ? target.username : ''}» хэрэглэгчийн нууц үг солигдлоо.`, true);
+    }catch(err){ if(!kickIfExpired(err)) UI.alertBox(msg, err.message); }
+  }
+
+  async function saveRename(el){
+    const tr = el.closest('tr');
+    const uid = tr.dataset.uid;
+    const newUser = tr.querySelector('.rn-user').value.trim();
+    const newName = tr.querySelector('.rn-name').value.trim();
+    if(!/^[a-zA-Z0-9_.-]{3,20}$/.test(newUser)){ UI.alertBox(msg, 'Нэвтрэх нэр 3-20 тэмдэгт: латин үсэг, тоо, _ . - байна.'); return; }
+    const target = USERS.find(u => String(u.id) === String(uid));
+    const isSelf = target && target.username === session.username;
+    if(!confirm(`«${target ? target.username : uid}» → «${newUser}» болгож солих уу?${isSelf ? '' : ' (Тухайн ажилтан шинэ нэрээрээ дахин нэвтэрнэ.)'}`)) return;
+    try{
+      const res = await API.userRename(uid, newUser, newName);
+      USERS = res.users || USERS;
+      if(isSelf){
+        // Өөрийн нэвтрэх нэр өөрчлөгдсөн — session-ий username-ийг шинэчилнэ
+        session.username = newUser;
+        if(newName) session.name = newName;
+        SESSION.save(session, !!localStorage.getItem('grd_session'));
+        UI.paintUserChrome();
+      }
+      render();
+      UI.alertBox(msg, `Нэвтрэх нэр «${newUser}» болж солигдлоо.`, true);
+    }catch(err){ if(!kickIfExpired(err)) UI.alertBox(msg, err.message); }
+  }
+
+  async function toggleActive(el){
+    const tr = el.closest('tr');
+    const uid = tr.dataset.uid;
+    const target = USERS.find(u => String(u.id) === String(uid));
+    if(!target) return;
+    const q = target.active
+      ? `«${target.username}» (${target.name || ''}) хэрэглэгчийг идэвхгүй болгох уу? Нэвтрэх боломжгүй болно, түүх хадгалагдана.`
+      : `«${target.username}» хэрэглэгчийг идэвхжүүлэх үү?`;
+    if(!confirm(q)) return;
+    try{
+      const res = await API.userToggle(uid);
+      USERS = res.users || USERS;
+      render();
+      UI.alertBox(msg, `«${target.username}» ${target.active ? 'идэвхгүй боллоо' : 'идэвхжлээ'}.`, true);
+    }catch(err){ if(!kickIfExpired(err)) UI.alertBox(msg, err.message); }
   }
 
   load();

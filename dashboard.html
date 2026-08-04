@@ -14,7 +14,7 @@
         <span class="nameplate-mark" aria-hidden="true"><img src="logo.png" alt="" width="38" height="38" style="display:block;border-radius:9px"></span>        <span class="nameplate-text"><h1>Говь Ресурс Девелопмент</h1><p>Хяналтын самбар</p></span>
       </a>
       <div class="top-actions">
-        <a class="btn btn-soft" href="report.html">Тайлан оруулах</a>
+        <a class="btn btn-soft" href="report.html">Тайлан</a>
         <a id="adminLink" class="btn btn-soft hidden" href="admin.html">Хэрэглэгчид</a>
         <span id="userPill" class="user-pill"></span>
         <button id="logoutBtn" class="btn btn-soft hidden">Гарах</button>
@@ -27,9 +27,8 @@
     <section class="bezel hero"><span class="tick-a"></span><span class="tick-b"></span>
       <div class="hero-row">
         <div>
-          <p class="eyebrow">Өдрийн заалт</p>
-          <h2>Өнөөдрийн байдал</h2>
-          <p id="heroDateLine">Хэлтэс бүрийн оруулсан тайлангаас автоматаар нэгтгэсэн үзүүлэлт.</p>
+          <h2 id="heroDate">Хяналтын самбар</h2>
+          <p id="heroDateLine">Тайлангийн нэгтгэл</p>
         </div>
         <div class="date-tools">
           <button class="btn btn-icon btn-soft" id="prevDayBtn" title="Өмнөх өдөр">‹</button>
@@ -43,7 +42,7 @@
 
     <section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
       <div class="panel-head">
-        <div><h3>Тайлангийн ирц</h3><p>Ирсэн тайлан дээр дарж дэлгэрэнгүйг харна.</p></div>
+        <div><h3>Тайлангийн ирц</h3></div>
         <div id="attendanceRing"></div>
       </div>
       <div id="statusRow" class="status-row"></div>
@@ -60,13 +59,18 @@
 
     <section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
       <div class="panel-head">
-        <div><h3>Сарын нэгтгэл</h3><p>Тухайн сарын нийлбэр дүн.</p></div>
+        <div><h3>Сарын төлөвлөгөөний биелэлт</h3><p>Үзүүлэлт бүрийг сарын явцтай харьцуулж, өнөөдрийн зорилтыг харуулна.</p></div>
         <div class="date-tools"><input id="dashboardMonth" type="month" aria-label="Сар сонгох"></div>
       </div>
-      <div id="monthlyCards" class="cards cards-3"></div>
+      <div id="planArea"></div>
     </section>
 
-    <div id="planSection"></div>
+    <section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head">
+        <div><h3>Сарын нэгтгэл</h3><p>Түлш, тээвэр, ХАБЭА-ийн сарын нийлбэр, өдөр тутмын задаргаа.</p></div>
+      </div>
+      <div id="monthlyCards"></div>
+    </section>
 
     <div id="monthlyMachines"></div>
 

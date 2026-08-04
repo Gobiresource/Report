@@ -1,0 +1,26 @@
+# =====================================================================
+# GRD Dashboard — Cloudflare Pages руу terminal-аас шууд deploy хийх
+# Хэрэглээ:   .\deploy.ps1
+# Нэг удаагийн бэлтгэл:
+#   npm install -g wrangler
+#   wrangler login          (browser нээгдэж Cloudflare-д нэвтэрнэ)
+#   npx wrangler pages project list   (project-ийн яг нэрээ шалгана)
+# =====================================================================
+$ErrorActionPreference = "Stop"
+Set-Location $PSScriptRoot
+
+# 1. Цэвэр dist хавтас — зөвхөн сайтад хэрэгтэй файлууд.
+#    schema.sql, CLAUDE.md, test_backend.cjs, migration_*.sql зэрэг дотоод
+#    файлыг ЗОРИУД ОРУУЛАХГҮЙ — эдгээр нь static asset болж нийтэд ил
+#    татагддаг байсан (schema.sql дотор PIN-үүд бий!).
+Remove-Item dist -Recurse -Force -ErrorAction Ignore
+New-Item dist -ItemType Directory | Out-Null
+Copy-Item index.html, dashboard.html, report.html, admin.html, app.js, style.css, logo.png, favicon.png dist\
+
+# 2. Deploy. functions/ хавтас нь энэ хавтаснаас (ажиллуулж буй байрлалаас)
+#    автоматаар хамт бондлогдож очно — dist руу хуулах шаардлагагүй.
+#    --branch main = production deployment.
+npx wrangler pages deploy dist --project-name report --branch main --commit-dirty=true
+
+Write-Host ""
+Write-Host "Deploy OK -> https://report-d3e.pages.dev (1-2 min)" -ForegroundColor Green

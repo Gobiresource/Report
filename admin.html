@@ -26,15 +26,17 @@
     <section class="bezel hero"><span class="tick-a"></span><span class="tick-b"></span>
       <p class="eyebrow">Админ</p>
       <h2>Хэрэглэгчийн удирдлага</h2>
-      <p>Ажилтнуудын нэвтрэх PIN кодыг эндээс солино. PIN солигдмогц тухайн ажилтан шинэ кодоороо нэвтэрнэ.</p>
+      <p>Ажилтан бүртгэх, нэвтрэх нэр болон нууц үг солих, идэвхгүй болгох. Хэлтэс бүрт хэдэн ч ажилтан бүртгэж болно — тайланг хэн илгээснийг самбар дээр нэрээр нь харна.</p>
     </section>
 
     <div id="adminMessage"></div>
 
     <section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
       <div class="panel-head">
-        <div><h3>Хэрэглэгчид</h3><p>«PIN солих» дээр дарж 4-8 оронтой шинэ код оруулна.</p></div>
+        <div><h3>Хэрэглэгчид</h3><p>Ажилтны нэрийг «Хэлтэс Нэр» хэлбэрээр бүртгэвэл ойлгомжтой (жишээ: Тээвэр Ууганбаяр).</p></div>
+        <button type="button" id="userAddBtn" class="btn btn-primary">+ Хэрэглэгч нэмэх</button>
       </div>
+      <div id="userAddBox" class="hidden"></div>
       <div id="userList"></div>
     </section>
   </main>

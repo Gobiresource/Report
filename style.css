@@ -735,15 +735,190 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
 /* Олон өдөртэй үед баганын зай багасна */
 .m-cols.m-dense,.m-days.m-dense{gap:3px}
 
-/* Хэрэглэгчийн удирдлага — PIN солих (admin.html) */
+/* Хэрэглэгчийн удирдлага (admin.html) */
 .btn-sm{padding:6px 13px;font-size:12.5px}
-.pin-edit{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
-.pin-input{
-  width:110px;border-radius:999px;padding:7px 13px;font-size:13.5px;
+.pw-edit,.rn-edit{display:inline-flex;gap:8px;align-items:center;flex-wrap:wrap;justify-content:flex-end}
+.row-actions{display:inline-flex;gap:6px;flex-wrap:wrap;justify-content:flex-end}
+.pw-input,.rn-user,.rn-name{
+  border-radius:999px;padding:7px 13px;font-size:13.5px;
   border:1px solid rgba(30,40,55,.12);background:#fff;
-  font-variant-numeric:tabular-nums;letter-spacing:.12em;
 }
-.pin-input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.pw-input{width:130px;letter-spacing:.1em}
+.rn-user{width:120px}
+.rn-name{width:170px}
+.pw-input:focus,.rn-user:focus,.rn-name:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
 .pin-badge{font-size:11px;font-weight:700;border-radius:999px;padding:3px 10px;white-space:nowrap}
 .pin-on{background:rgba(52,199,89,.12);color:var(--green)}
 .pin-off{background:rgba(60,60,80,.08);color:var(--ink-3)}
+.user-inactive td{opacity:.55}
+/* Шинэ хэрэглэгч бүртгэх form */
+.user-form{
+  background:#FAFBFA;border:1px solid rgba(30,40,55,.06);border-radius:16px;
+  padding:18px;margin-bottom:16px;
+  display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px;
+}
+.user-form-row{display:flex;flex-direction:column;gap:6px}
+.user-form-row label{font-size:12.5px;font-weight:600;color:var(--ink-2)}
+.user-form-row label small{color:var(--ink-3);font-weight:500}
+.user-form-row input{
+  border-radius:12px;padding:9px 13px;font-size:14px;
+  border:1px solid rgba(30,40,55,.12);background:#fff;
+}
+.user-form-row input:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 3px var(--brand-soft)}
+.user-form-perms{grid-column:1/-1}
+.user-form .form-actions{grid-column:1/-1;display:flex;gap:10px;justify-content:flex-end;padding-top:2px}
+.perm-chips{display:flex;gap:8px;flex-wrap:wrap}
+.perm-chip{cursor:pointer}
+.perm-chip input{position:absolute;opacity:0;pointer-events:none}
+.perm-chip span{
+  display:inline-block;border-radius:999px;padding:7px 14px;font-size:13px;font-weight:600;
+  background:#fff;border:1px solid rgba(30,40,55,.12);color:var(--ink-2);
+  transition:all .15s ease;
+}
+.perm-chip input:checked + span{background:var(--brand);border-color:var(--brand);color:#fff}
+@media(max-width:760px){.user-form{grid-template-columns:1fr}}
+
+/* =========================================================================
+   V15 — KPI КАРТЫН ОРЧИН ҮЕИЙН ВИЗУАЛ:
+   CAPS шошго, том тоо + хажуугийн trend chip, хуваарилалтын зурвас (segments),
+   хэвтээ бар (hbars), тоолуурын chip (chips)
+   ========================================================================= */
+.card .label{font-size:10.5px;letter-spacing:.07em;text-transform:uppercase;color:#98A0A6;font-weight:700}
+.card-featured .label{color:rgba(255,255,255,.85)}
+.trend-chip{border:none;padding:4px 10px;font-size:11px}
+.value-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:5px}
+.value-row .value{margin:0}
+.value-row .trend-chip{margin:0}
+.cards .card-full .value-row{margin:0}
+/* Хуваарилалтын зурвас — завсартай дугуй сегментүүд + цэгтэй legend */
+.seg-bar{display:flex;gap:3px;height:10px;margin:14px 0 10px}
+.seg-bar span{height:100%;border-radius:999px;min-width:8px}
+.seg-legend{display:flex;gap:13px;flex-wrap:wrap}
+.seg-legend .sl{display:inline-flex;align-items:center;gap:5px;font-size:11.5px;color:var(--ink-2);font-weight:600}
+.sl i{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
+.sl b{color:var(--ink);font-variant-numeric:tabular-nums}
+/* Хэвтээ харьцуулалтын бар */
+.hbar-list{display:flex;flex-direction:column;gap:9px;margin:14px 0 6px}
+.hbar-row{display:grid;grid-template-columns:62px 1fr 46px;gap:8px;align-items:center}
+.hbar-row .hl{font-size:11.5px;color:var(--ink-2);font-weight:600;white-space:nowrap}
+.hbar-track{height:10px;border-radius:999px;background:rgba(60,70,80,.07);overflow:hidden}
+.hbar-fill{display:block;height:100%;border-radius:999px;box-shadow:inset 0 1px 0 rgba(255,255,255,.35);transition:width .7s cubic-bezier(.22,.8,.3,1)}
+.hbar-val{font-size:11.5px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+/* Тоолуурын chip — цэгтэй, өнгөөр ялгасан */
+.kpi-chips{display:flex;gap:9px;margin:16px 0 8px;flex-wrap:wrap}
+.kpi-chip{border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;gap:7px}
+.kpi-chip::before{content:'';width:7px;height:7px;border-radius:50%;background:currentColor}
+.kpi-chip.bad{background:rgba(255,69,58,.1);color:var(--warn)}
+.kpi-chip.mid{background:rgba(255,159,10,.13);color:#B96A00}
+.kpi-chip.ok{background:rgba(52,199,89,.12);color:var(--green)}
+
+/* =========================================================================
+   V16 — САРЫН НЭГТГЭЛ: сэдэвчилсэн блокууд (Үйлдвэрлэлт / Түлш /
+   Тээвэр ба олборлолт / ХАБЭА). Нэгтгэл + төлөвлөгөө нэг дор, давхардалгүй.
+   ========================================================================= */
+.theme-actions{display:flex;justify-content:flex-end;margin-bottom:12px}
+.theme-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px}
+.theme-block{background:#FAFBFA;border:1px solid rgba(30,40,55,.05);border-radius:16px;padding:16px 18px}
+.tb-wide{grid-column:1/-1}
+.tb-head{display:flex;align-items:center;gap:10px;font-size:13.5px;margin-bottom:12px}
+.tb-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.tb-stats{grid-template-columns:repeat(2,minmax(0,1fr));margin-top:12px}
+.tb-foot{margin-top:10px}
+.g-item{display:flex;align-items:center;gap:14px;background:#fff;border:1px solid rgba(30,40,55,.05);border-radius:14px;padding:12px 14px}
+.g-ring{width:76px;height:76px;flex-shrink:0}
+.g-ring .plan-ring-center b{font-size:14px}
+.g-info{min-width:0;flex:1}
+.g-name{font-size:12px;font-weight:700;display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:4px}
+.g-nums{font-variant-numeric:tabular-nums;margin-bottom:4px}
+.g-nums b{font-size:21px;font-weight:800;letter-spacing:-.02em}
+.g-stat{margin-bottom:10px}
+.g-stat:last-child{margin-bottom:0}
+.theme-block>.m-cols{margin-top:12px}
+.theme-grid-3{grid-template-columns:repeat(3,minmax(0,1fr))}
+@media(max-width:900px){
+  .theme-grid,.theme-grid-3,.tb-row,.tb-stats{grid-template-columns:1fr}
+}
+
+/* =========================================================================
+   V17 — ТӨЛӨВЛӨГӨӨНИЙ БИЕЛЭЛТ: legend + сарын явцын pill + статус текст +
+   pace шугамтай bar карт. МАШИНЫ ҮР БҮТЭЭМЖ: л/тонн эрэмбэ + машины картууд.
+   ========================================================================= */
+/* Толгойн хэрэгслүүд */
+.pl-toolbar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:14px}
+.pl-tools{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.lg-chips{display:flex;gap:8px;flex-wrap:wrap}
+.lg-chip{border-radius:999px;padding:6px 13px;font-size:12px;font-weight:700;white-space:nowrap}
+.lg-good{background:rgba(52,199,89,.13);color:#2E9E52}
+.lg-mid{background:rgba(255,159,10,.16);color:#B96A00}
+.lg-low{background:rgba(255,69,58,.11);color:var(--warn)}
+.mp-pill{
+  display:inline-flex;align-items:center;gap:9px;border-radius:999px;padding:8px 15px;
+  background:#2A3140;color:#fff;font-size:12.5px;font-weight:700;white-space:nowrap;
+}
+.mp-track{width:70px;height:6px;border-radius:999px;background:rgba(255,255,255,.25);overflow:hidden;display:inline-block}
+.mp-fill{display:block;height:100%;border-radius:999px;background:#5AD97C}
+.mp-pill b{font-variant-numeric:tabular-nums}
+/* Биелэлтийн картууд */
+.pl-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:14px}
+.pl-card{background:#FAFBFA;border:1px solid rgba(30,40,55,.05);border-radius:16px;padding:18px 20px}
+.pl-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:10px}
+.pl-name{font-size:13px;font-weight:700}
+.pl-pct{border-radius:999px;padding:5px 12px;font-size:12px;font-weight:800;font-variant-numeric:tabular-nums;flex-shrink:0}
+.pl-pct.t-good{background:rgba(52,199,89,.14);color:#2E9E52}
+.pl-pct.t-mid{background:rgba(255,159,10,.18);color:#B96A00}
+.pl-pct.t-low{background:rgba(255,69,58,.12);color:var(--warn)}
+.pl-nums{display:flex;align-items:baseline;gap:7px;margin-bottom:12px;font-variant-numeric:tabular-nums}
+.pl-nums b{font-size:27px;font-weight:800;letter-spacing:-.02em;line-height:1}
+.pl-nums span{font-size:12.5px;font-weight:600;color:var(--ink-2)}
+.pl-bar{position:relative;height:8px;border-radius:999px;background:#fff;box-shadow:inset 0 1px 2px rgba(40,40,70,.06)}
+.pl-fill{position:absolute;inset:0 auto 0 0;border-radius:999px;max-width:100%}
+.pl-fill.f-good{background:#34C759}
+.pl-fill.f-mid{background:#FF9F0A}
+.pl-fill.f-low{background:var(--warn)}
+.pl-pace{position:absolute;top:-4px;bottom:-4px;width:2px;border-radius:2px;background:#2A3140;opacity:.7;transform:translateX(-50%)}
+.pl-foot{display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-top:10px;font-size:12px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.pl-foot b{color:var(--ink)}
+.pl-status{font-weight:800;white-space:nowrap}
+.pl-status.s-good{color:#2E9E52}
+.pl-status.s-mid{color:#B96A00}
+.pl-status.s-low{color:var(--warn)}
+.pl-card .m-cols{margin-top:14px}
+.pl-note{
+  display:inline-block;margin-top:10px;border-radius:999px;padding:6px 12px;
+  background:#fff;border:1px solid rgba(30,40,55,.07);font-size:11.5px;font-weight:700;color:var(--ink-2);
+}
+/* Машины үр бүтээмж */
+.eff-grid{display:grid;grid-template-columns:minmax(300px,5fr) minmax(340px,7fr);gap:14px;align-items:start}
+.eff-card{background:#FAFBFA;border:1px solid rgba(30,40,55,.05);border-radius:16px;padding:18px 20px}
+.eff-card-head{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.eff-card-head b{font-size:15px;font-weight:800}
+.eff-tag{background:#fff;border:1px solid rgba(30,40,55,.07);border-radius:999px;padding:5px 12px;font-size:11.5px;font-weight:700;color:var(--ink-2);white-space:nowrap}
+.eff-card-sub{font-size:12px;color:var(--ink-3);font-weight:600;margin-top:4px}
+.eff-rank{display:flex;flex-direction:column;gap:13px;margin-top:16px}
+.eff-row-top{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:6px}
+.eff-nm{font-size:12.5px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.eff-badge{background:#2A3140;color:#fff;border-radius:8px;padding:3px 9px;font-size:11.5px;font-weight:800;font-variant-numeric:tabular-nums;flex-shrink:0}
+.eff-track{height:10px;border-radius:999px;background:#fff;box-shadow:inset 0 1px 2px rgba(40,40,70,.06);overflow:hidden}
+.eff-fill{display:block;height:100%;border-radius:999px}
+.mach-list{display:flex;flex-direction:column;gap:9px;margin-top:14px}
+.mach-card{
+  display:grid;grid-template-columns:auto 1fr auto;gap:13px;align-items:center;
+  background:#fff;border:1px solid rgba(30,40,55,.05);border-radius:14px;padding:12px 15px;
+}
+.mach-best{border:2px solid rgba(52,199,89,.45)}
+.mach-ava{
+  width:40px;height:40px;border-radius:12px;display:flex;align-items:center;justify-content:center;
+  color:#fff;font-weight:800;font-size:13px;flex-shrink:0;
+}
+.mach-info{min-width:0}
+.mach-nm{font-size:13.5px;font-weight:800;display:flex;align-items:center;gap:7px;flex-wrap:wrap}
+.mach-pill{border-radius:999px;padding:2px 9px;font-size:10.5px;font-weight:700;white-space:nowrap}
+.mach-star{background:rgba(52,199,89,.14);color:#2E9E52}
+.mach-sub{margin-top:4px;font-size:11.5px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.mach-eff{text-align:right;flex-shrink:0}
+.mach-eff b{display:block;font-size:19px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1}
+.mach-eff small{font-size:10.5px;font-weight:700;color:var(--ink-3)}
+@media(max-width:900px){
+  .eff-grid{grid-template-columns:1fr}
+  .pl-toolbar{flex-direction:column;align-items:flex-start}
+}

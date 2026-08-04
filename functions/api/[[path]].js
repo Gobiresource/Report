@@ -232,29 +232,106 @@ async function handlePlanSave(db, body) {
 }
 
 // ---------- Хэрэглэгчийн удирдлага (зөвхөн admin) ----------
-async function handleUsersList(db, body) {
+const USERNAME_RE = /^[a-zA-Z0-9_.-]{3,20}$/;
+const PASSWORD_RE = /^\S{4,20}$/; // Нууц үг: 4-20 тэмдэгт, хоосон зайгүй
+const REPORT_KEYS = ['production','transport','fuel','equipment','camp','hse','issue'];
+
+async function requireAdmin(db, body) {
   const user = await findUser(db, body.username, body.pin);
-  if (!user || !user.active) return fail('Нэвтрэлт хүчингүй байна. Дахин нэвтэрнэ үү.', 401);
-  if (user.role !== 'admin') return fail('Хэрэглэгчийн удирдлага зөвхөн админд нээлттэй.', 403);
+  if (!user || !user.active) return {err: fail('Нэвтрэлт хүчингүй байна. Дахин нэвтэрнэ үү.', 401)};
+  if (user.role !== 'admin') return {err: fail('Хэрэглэгчийн удирдлага зөвхөн админд нээлттэй.', 403)};
+  return {user};
+}
+
+async function handleUsersList(db, body) {
+  const {user, err} = await requireAdmin(db, body);
+  if (err) return err;
   const rows = await db.prepare(
-    `SELECT id, username, name, role, department, active FROM users ORDER BY role = 'admin' DESC, username`
+    `SELECT id, username, name, role, department, active FROM users ORDER BY role = 'admin' DESC, active DESC, username`
   ).all();
-  return ok({users: rows.results || []});
+  const perms = await db.prepare(
+    `SELECT user_id, report_type_key FROM user_report_permissions WHERE can_submit = 1`
+  ).all();
+  const byUser = {};
+  (perms.results || []).forEach(p => { (byUser[p.user_id] = byUser[p.user_id] || []).push(p.report_type_key); });
+  const users = (rows.results || []).map(u => ({...u, permissions: byUser[u.id] || []}));
+  return ok({users});
 }
 
 async function handleUserSetPin(db, body) {
-  const user = await findUser(db, body.username, body.pin);
-  if (!user || !user.active) return fail('Нэвтрэлт хүчингүй байна. Дахин нэвтэрнэ үү.', 401);
-  if (user.role !== 'admin') return fail('PIN солих эрх зөвхөн админд бий.', 403);
+  const {user, err} = await requireAdmin(db, body);
+  if (err) return err;
   const targetId = parseInt(body.user_id, 10);
   const newPin = String(body.new_pin || '').trim();
   if (!targetId) return fail('Хэрэглэгчийн ID байхгүй.');
-  if (!/^\d{4,8}$/.test(newPin)) return fail('PIN 4-8 оронтой тоо байх ёстой.');
+  if (!PASSWORD_RE.test(newPin)) return fail('Нууц үг 4-20 тэмдэгт байх ёстой (хоосон зайгүй).');
   const target = await db.prepare(`SELECT id, username FROM users WHERE id = ? LIMIT 1`).bind(targetId).first();
   if (!target) return fail('Хэрэглэгч олдсонгүй.', 404);
   await db.prepare(`UPDATE users SET pin = ? WHERE id = ?`).bind(newPin, targetId).run();
-  // Аюулгүй байдлын үүднээс шинэ PIN-ийг audit log-д БИЧИХГҮЙ
+  // Аюулгүй байдлын үүднээс шинэ нууц үгийг audit log-д БИЧИХГҮЙ
   await logAction(db, user.id, 'user_set_pin', target.username, {user_id: targetId});
+  return await handleUsersList(db, body);
+}
+
+async function handleUserRename(db, body) {
+  const {user, err} = await requireAdmin(db, body);
+  if (err) return err;
+  const targetId = parseInt(body.user_id, 10);
+  const newUsername = String(body.new_username || '').trim();
+  const newName = body.new_name !== undefined ? String(body.new_name || '').trim() : null;
+  if (!targetId) return fail('Хэрэглэгчийн ID байхгүй.');
+  if (!USERNAME_RE.test(newUsername)) return fail('Нэвтрэх нэр 3-20 тэмдэгт: латин үсэг, тоо, _ . - байж болно.');
+  const target = await db.prepare(`SELECT id, username FROM users WHERE id = ? LIMIT 1`).bind(targetId).first();
+  if (!target) return fail('Хэрэглэгч олдсонгүй.', 404);
+  const dup = await db.prepare(`SELECT id FROM users WHERE username = ? AND id != ? LIMIT 1`).bind(newUsername, targetId).first();
+  if (dup) return fail('Энэ нэвтрэх нэр аль хэдийн ашиглагдаж байна.');
+  if (newName !== null && newName !== '') {
+    await db.prepare(`UPDATE users SET username = ?, name = ? WHERE id = ?`).bind(newUsername, newName, targetId).run();
+  } else {
+    await db.prepare(`UPDATE users SET username = ? WHERE id = ?`).bind(newUsername, targetId).run();
+  }
+  await logAction(db, user.id, 'user_rename', target.username, {user_id: targetId, new_username: newUsername});
+  return await handleUsersList(db, body);
+}
+
+async function handleUserCreate(db, body) {
+  const {user, err} = await requireAdmin(db, body);
+  if (err) return err;
+  const username = String(body.new_username || '').trim();
+  const name = String(body.new_name || '').trim();
+  const password = String(body.new_pin || '').trim();
+  const permissions = Array.isArray(body.permissions)
+    ? body.permissions.filter(k => REPORT_KEYS.includes(k)) : [];
+  if (!USERNAME_RE.test(username)) return fail('Нэвтрэх нэр 3-20 тэмдэгт: латин үсэг, тоо, _ . - байж болно.');
+  if (!name) return fail('Ажилтны нэрийг оруулна уу (жишээ: Тээвэр Ууганбаяр).');
+  if (!PASSWORD_RE.test(password)) return fail('Нууц үг 4-20 тэмдэгт байх ёстой (хоосон зайгүй).');
+  if (!permissions.length) return fail('Дор хаяж нэг тайлангийн эрх сонгоно уу.');
+  const dup = await db.prepare(`SELECT id FROM users WHERE username = ? LIMIT 1`).bind(username).first();
+  if (dup) return fail('Энэ нэвтрэх нэр аль хэдийн ашиглагдаж байна.');
+  const ins = await db.prepare(
+    `INSERT INTO users (username, pin, name, role, department, active) VALUES (?, ?, ?, 'worker', ?, 1)`
+  ).bind(username, password, name, permissions[0]).run();
+  const newId = ins.meta && ins.meta.last_row_id;
+  for (const key of permissions) {
+    await db.prepare(
+      `INSERT INTO user_report_permissions (user_id, report_type_key, can_submit) VALUES (?, ?, 1)`
+    ).bind(newId, key).run();
+  }
+  await logAction(db, user.id, 'user_create', username, {name, permissions});
+  return await handleUsersList(db, body);
+}
+
+async function handleUserToggle(db, body) {
+  const {user, err} = await requireAdmin(db, body);
+  if (err) return err;
+  const targetId = parseInt(body.user_id, 10);
+  if (!targetId) return fail('Хэрэглэгчийн ID байхгүй.');
+  if (targetId === user.id) return fail('Өөрийгөө идэвхгүй болгох боломжгүй.');
+  const target = await db.prepare(`SELECT id, username, active FROM users WHERE id = ? LIMIT 1`).bind(targetId).first();
+  if (!target) return fail('Хэрэглэгч олдсонгүй.', 404);
+  const next = target.active ? 0 : 1;
+  await db.prepare(`UPDATE users SET active = ? WHERE id = ?`).bind(next, targetId).run();
+  await logAction(db, user.id, next ? 'user_activate' : 'user_deactivate', target.username, {user_id: targetId});
   return await handleUsersList(db, body);
 }
 
@@ -281,6 +358,9 @@ export async function onRequest(context) {
     if (method === 'POST' && route === 'plan/save')  return await handlePlanSave(env.DB, await readBody(request));
     if (method === 'POST' && route === 'users')        return await handleUsersList(env.DB, await readBody(request));
     if (method === 'POST' && route === 'users/setpin') return await handleUserSetPin(env.DB, await readBody(request));
+    if (method === 'POST' && route === 'users/rename') return await handleUserRename(env.DB, await readBody(request));
+    if (method === 'POST' && route === 'users/create') return await handleUserCreate(env.DB, await readBody(request));
+    if (method === 'POST' && route === 'users/toggle') return await handleUserToggle(env.DB, await readBody(request));
     return fail('API endpoint олдсонгүй: ' + route, 404);
   } catch (err) {
     return fail(err.message || 'Серверийн алдаа гарлаа.', 500);
