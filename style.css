@@ -532,19 +532,41 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
 }
 .viz-title{font-size:13px;font-weight:700;margin-bottom:12px;letter-spacing:-.01em}
 
-/* Donut */
-.donut-wrap{display:flex;align-items:center;gap:22px;flex-wrap:wrap}
-.donut-fig{position:relative;width:130px;height:130px;flex-shrink:0}
-.donut-svg{width:100%;height:100%}
-.donut-center{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
-.donut-center b{font-size:19px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
-.donut-center small{font-size:10.5px;color:var(--ink-2);font-weight:600}
-.donut-legend{display:flex;flex-direction:column;gap:8px;min-width:200px;flex:1}
-.donut-leg{display:flex;align-items:center;gap:8px;font-size:13px}
+/* V18 — Donut: сегмент дээрх хувийн badge + дүрслэлтэй legend */
+.donut-wrap{display:flex;align-items:center;gap:24px;flex-wrap:wrap;margin:4px 0 2px}
+.donut-fig{position:relative;width:216px;height:216px;flex-shrink:0}
+.donut-svg{display:block;max-width:100%;height:auto;overflow:visible}
+/* Голын тоо ЯГ голдоо; нэгж нь түүний доор тэнхлэгээр голлоно.
+   --dn-fs нь JS-ээс ирнэ — тоо урт болох тусам багасч нүхэндээ багтана. */
+.donut-center{position:absolute;inset:0;pointer-events:none}
+.donut-num{position:absolute;left:0;right:0;top:50%;transform:translateY(-50%);text-align:center;
+  font-size:var(--dn-fs,40px);font-weight:800;letter-spacing:-.035em;font-variant-numeric:tabular-nums;line-height:1}
+.donut-sub{position:absolute;left:0;right:0;top:calc(50% + var(--dn-fs,40px) * .52 + 5px);text-align:center;line-height:1.2}
+.donut-sub span{display:block;font-size:11.5px;font-weight:700;letter-spacing:.03em;text-transform:uppercase;color:var(--ink-2)}
+.donut-sub small{display:block;font-size:12px;font-weight:700;letter-spacing:.06em;color:var(--ink-3);margin-top:2px}
+.donut-badge-t{font-size:12.5px;font-weight:800;fill:#fff;letter-spacing:-.02em}
+.donut-legend{display:flex;flex-direction:column;gap:17px;min-width:196px;flex:1}
+.donut-leg{display:flex;align-items:center;gap:12px;font-size:14.5px}
+.donut-ic{display:block;flex-shrink:0;line-height:0}
+/* Тээврийн төрлийн дүрс — гурвуулаа ижил хэмжээтэй, SVG-ээ гажуудуулахгүй */
+.transport-type-icon{width:48px;height:36px;object-fit:contain;flex:0 0 48px;display:block}
 .donut-dot{width:10px;height:10px;border-radius:3px;flex-shrink:0}
-.donut-leg-label{flex:1;color:var(--ink-2);font-weight:500}
-.donut-leg-val{font-weight:700;font-variant-numeric:tabular-nums}
-.donut-leg-val small{color:var(--ink-3);font-weight:600}
+.donut-leg-label{flex:1;color:var(--ink);font-weight:600;min-width:0}
+.donut-leg-val{font-weight:800;font-size:16px;font-variant-numeric:tabular-nums;white-space:nowrap}
+.donut-leg-val small{color:var(--ink-3);font-weight:600;font-size:14px;margin-left:3px}
+/* Дэлгэрэнгүй цонх дахь энгийн хэлбэр */
+.donut-plain .donut-fig{width:180px;height:180px}
+.donut-plain .donut-num{font-size:calc(var(--dn-fs,40px) * .82)}
+.donut-plain .donut-sub{top:calc(50% + var(--dn-fs,40px) * .44 + 4px)}
+@media(max-width:620px){
+  .donut-fig{width:196px;height:196px}
+  .donut-num{font-size:calc(var(--dn-fs,40px) * .88)}
+  .donut-sub{top:calc(50% + var(--dn-fs,40px) * .46 + 4px)}
+  .donut-leg{font-size:14px;gap:11px}
+  .transport-type-icon{width:42px;height:32px;flex:0 0 42px}
+  .donut-leg-val{font-size:15px}
+  .donut-badge-t{font-size:12px}
+}
 
 /* Хэвтээ bar жагсаалт */
 .bar-list{display:flex;flex-direction:column;gap:11px}
@@ -613,24 +635,32 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
    GAUGE — бүтээгдэхүүний гарц vs төлөвлөгөөний дундаж
    Тоо нуман дотроо, тайлбар графикийн ДООР — зүү/хуваарьтай давхарлахгүй.
    ========================================================================= */
-.gauge-wrap{max-width:340px;margin:6px auto 0;width:100%}
+/* V18 — Спидометр заалт: улаанаас ногоон руу шилжих градиент нум,
+   хуваарийн зураас, үзүүрт нь одоогийн байрлалыг заах цагаан цагираг.
+   Норм дүүрч байж л нум бүтэн (100%) болно. */
+.gauge-wrap{max-width:340px;margin:2px auto 0;width:100%}
 .gauge-fig{position:relative}
-.gauge-svg{width:100%;height:auto;display:block}
-.gauge-tick{stroke:rgba(60,60,80,.16);stroke-width:5;stroke-linecap:round}
-.gauge-tick.on{stroke:var(--brand)}
-.gauge-tick.target{stroke:var(--c-transport);stroke-width:6.5}
-.gauge-needle{stroke:var(--c-transport);stroke-width:5;stroke-linecap:round}
-.gauge-center{position:absolute;left:0;right:0;bottom:3%;text-align:center;pointer-events:none}
-.gauge-center b{font-size:30px;font-weight:800;letter-spacing:-.02em;font-variant-numeric:tabular-nums;line-height:1}
-.gauge-unit{font-size:13px;font-weight:600;color:var(--ink-2);margin-left:4px}
+.gauge-svg{width:100%;height:auto;display:block;overflow:visible}
+.gauge-track{stroke:rgba(60,60,80,.10)}
+.gauge-tick{stroke:rgba(60,60,80,.22);stroke-width:2.4;stroke-linecap:round}
+.gauge-tick.major{stroke:rgba(60,60,80,.40);stroke-width:3.4}
+.gauge-dot{fill:none;stroke:#fff;filter:drop-shadow(0 1px 3px rgba(20,22,26,.28))}
+.gauge-center{position:absolute;left:0;right:0;bottom:13%;text-align:center;pointer-events:none}
+.gauge-center b{font-size:34px;font-weight:800;letter-spacing:-.03em;font-variant-numeric:tabular-nums;line-height:1}
+.gauge-unit{display:block;font-size:11px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-3);margin-top:5px}
+.gauge-foot{display:flex;justify-content:space-between;align-items:center;gap:10px;flex-wrap:wrap;
+  margin-top:12px;padding-top:12px;border-top:1px solid var(--hairline);
+  font-size:12px;font-weight:600;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.gauge-foot b{font-weight:800;color:var(--ink)}
 .gauge-caption{text-align:center;font-size:11px;font-weight:600;color:var(--ink-2);margin-top:8px;line-height:1.35}
-/* Онцлох улаан карт дээрх gauge — цагаан хуваарь, алтан заагч */
-.card-featured .gauge-tick{stroke:rgba(255,255,255,.25)}
-.card-featured .gauge-tick.on{stroke:#fff}
-.card-featured .gauge-tick.target{stroke:#FFD60A}
-.card-featured .gauge-needle{stroke:#FFD60A}
+/* Онцлох улаан карт дээрх gauge — цагаан бэх, тунгалаг хуваарь */
+.card-featured .gauge-track{stroke:rgba(255,255,255,.18)}
+.card-featured .gauge-tick{stroke:rgba(255,255,255,.42)}
+.card-featured .gauge-tick.major{stroke:rgba(255,255,255,.82)}
 .card-featured .gauge-center b{color:#fff}
-.card-featured .gauge-unit{color:rgba(255,255,255,.75)}
+.card-featured .gauge-unit{color:rgba(255,255,255,.72)}
+.card-featured .gauge-foot{border-top-color:rgba(255,255,255,.20);color:rgba(255,255,255,.86)}
+.card-featured .gauge-foot b{color:#fff}
 .card-featured .gauge-caption{color:rgba(255,255,255,.78)}
 
 /* =========================================================================
@@ -644,16 +674,7 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
 .wave-dot{stroke:#fff;stroke-width:2}
 .wave-line{filter:drop-shadow(0 2px 4px rgba(40,40,70,.2))}
 
-/* =========================================================================
-   DONUT — compact горим + сегментийн % badge
-   ========================================================================= */
-.donut-compact{gap:14px}
-.donut-compact .donut-fig{width:118px;height:118px}
-.donut-compact .donut-center b{font-size:16px}
-.donut-compact .donut-legend{min-width:0;gap:6px}
-.donut-compact .donut-leg{font-size:11.5px}
-.donut-badge-c{stroke:#fff;stroke-width:1.5}
-.donut-badge-t{font-size:7px;font-weight:800;fill:#fff}
+/* (V18-д donut шинэчлэгдсэн — хуучин compact дүрмүүд хасагдав) */
 
 /* =========================================================================
    БАГТААМЖИЙН ЗАСВАР — текст таслагдахгүй, картууд шахагдахгүй
@@ -668,7 +689,7 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
 .mini-bar-label{font-size:9px;max-width:100%;white-space:normal;text-align:center;line-height:1.15}
 .mini-bars{gap:6px}
 /* Donut legend бүрэн эвхэгдэнэ */
-.donut-leg-label{overflow-wrap:anywhere;word-break:break-word}
+.donut-leg-label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 /* Bar жагсаалтын утга таслагдахгүй */
 .bar-val{white-space:normal;overflow-wrap:anywhere}
 
@@ -684,12 +705,8 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
 .card .card-tag-row{align-items:center}
 .card .card-tag-row .trend-chip{margin:0;flex-shrink:0}
 /* Gauge-ийн нэгдсэн дүрмүүд дээрх GAUGE хэсэгт байгаа */
-/* Donut compact — картанд төвлөрч багтана */
-.donut-compact{justify-content:center;gap:18px}
-.donut-compact .donut-fig{width:150px;height:150px}
-.donut-compact .donut-legend{min-width:150px;flex:0 1 auto}
-.donut-badge-c{stroke:#fff;stroke-width:1.5}
-.donut-badge-t{font-size:7.5px;font-weight:800;fill:#fff}
+/* Donut — картанд төвлөрч багтана (V18 хэмжээсээр) */
+.donut-wrap{justify-content:flex-start}
 /* Ганц үлдсэн карт (Асуудал) — бүтэн мөр эзэлдэг хэвтээ карт, тэгш бус мөр үүсгэхгүй */
 .cards .card-full{grid-column:1/-1;flex-direction:row;align-items:center;gap:18px}
 .cards .card-full .card-tag-row{margin:0;flex-shrink:0}
@@ -699,7 +716,7 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
 /* Жижиг дэлгэцэнд wide карт бүтэн мөр болно */
 @media(max-width:900px){
   .card-wide{grid-column:1/-1}
-  .donut-compact{gap:12px}
+  .donut-wrap{gap:16px;justify-content:center}
   .cards .card-full{flex-direction:column;align-items:flex-start;gap:8px}
   .cards .card-full .sub{margin-left:0;text-align:left}
 }
@@ -798,12 +815,27 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
 .sl i{width:8px;height:8px;border-radius:50%;display:inline-block;flex-shrink:0}
 .sl b{color:var(--ink);font-variant-numeric:tabular-nums}
 /* Хэвтээ харьцуулалтын бар */
-.hbar-list{display:flex;flex-direction:column;gap:9px;margin:14px 0 6px}
-.hbar-row{display:grid;grid-template-columns:62px 1fr 46px;gap:8px;align-items:center}
-.hbar-row .hl{font-size:11.5px;color:var(--ink-2);font-weight:600;white-space:nowrap}
-.hbar-track{height:10px;border-radius:999px;background:rgba(60,70,80,.07);overflow:hidden}
-.hbar-fill{display:block;height:100%;border-radius:999px;box-shadow:inset 0 1px 0 rgba(255,255,255,.35);transition:width .7s cubic-bezier(.22,.8,.3,1)}
-.hbar-val{font-size:11.5px;font-weight:700;text-align:right;font-variant-numeric:tabular-nums}
+/* V18 — Цэвэр тоон мөр (харьцуулах суурьгүй үзүүлэлтэд: түлш г.м.) */
+.stat-rows{display:flex;flex-direction:column;margin:14px 0 2px}
+.stat-row{display:flex;justify-content:space-between;align-items:baseline;gap:12px;
+  padding:10px 0;border-top:1px solid var(--hairline)}
+.stat-row:first-child{border-top:0;padding-top:2px}
+.stat-row .sr-l{font-size:12.5px;font-weight:600;color:var(--ink-2);white-space:nowrap}
+.stat-row .sr-v{font-size:16px;font-weight:800;font-variant-numeric:tabular-nums;white-space:nowrap}
+.stat-row .sr-v small{font-size:11.5px;font-weight:600;color:var(--ink-3);margin-left:3px}
+.stat-row.neg .sr-v{color:var(--warn)}
+
+/* V18 — өнгөний шилжилттэй pill бар, үзүүрт нь цагаан товгор */
+.hbar-list{display:flex;flex-direction:column;gap:11px;margin:14px 0 4px}
+.hbar-row{display:grid;grid-template-columns:66px 1fr auto;gap:10px;align-items:center}
+.hbar-row .hl{font-size:12.5px;color:var(--ink-2);font-weight:600;white-space:nowrap}
+.hbar-track{height:18px;border-radius:999px;background:#EEF0F2}
+.hbar-fill{position:relative;display:block;height:100%;border-radius:999px;min-width:18px;
+  transition:width .7s cubic-bezier(.22,.8,.3,1)}
+.hbar-knob{position:absolute;right:3px;top:50%;transform:translateY(-50%);
+  width:12px;height:12px;border-radius:50%;background:#fff;box-shadow:0 1px 2px rgba(20,22,26,.18)}
+.hbar-val{font-size:13.5px;font-weight:800;text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.hbar-val small{font-size:11.5px;font-weight:600;color:var(--ink-3);margin-left:2px}
 /* Тоолуурын chip — цэгтэй, өнгөөр ялгасан */
 .kpi-chips{display:flex;gap:9px;margin:16px 0 8px;flex-wrap:wrap}
 .kpi-chip{border-radius:999px;padding:8px 14px;font-size:12.5px;font-weight:700;display:inline-flex;align-items:center;gap:7px}
@@ -921,4 +953,81 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
 @media(max-width:900px){
   .eff-grid{grid-template-columns:1fr}
   .pl-toolbar{flex-direction:column;align-items:flex-start}
+}
+
+/* =========================================================================
+   АСУУДЛЫН НЭГТГЭЛ — хэлтэс бүрийн тайлангийн асуудлыг ялган харуулах карт
+   ========================================================================= */
+/* Бүтэн мөрийн карт боловч дотроо жагсаалт агуулдаг тул босоо өрөлттэй */
+.cards .card-full.card-issues{flex-direction:column;align-items:stretch;gap:0}
+.cards .card-full.card-issues .card-tag-row{margin-bottom:12px;width:100%}
+.card-issues.card-warn{background:#fff;border-color:rgba(255,107,74,.28)}
+
+.issue-tally{
+  font-size:11.5px;font-weight:700;letter-spacing:-.01em;white-space:nowrap;flex-shrink:0;
+  border-radius:999px;padding:4px 11px;background:#F3F5F7;color:var(--ink-2);
+  font-variant-numeric:tabular-nums;
+}
+.issue-tally.ok{background:rgba(52,199,89,.12);color:#2E9E52}
+.issue-tally.bad{background:rgba(255,107,74,.13);color:#D3502F}
+
+.issue-none{font-size:12.5px;color:var(--ink-3);font-weight:600;padding:2px 2px 2px}
+
+/* Асуудлын жагсаалт — 2 багана, хэлтэс тус бүр өөрийн өнгөт зураастай */
+.issue-list{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.issue-item{
+  position:relative;border-radius:14px;padding:12px 14px 12px 16px;
+  background:#FAFBFC;border:1px solid rgba(30,40,55,.055);
+  border-left:4px solid var(--iss, #C7CDD3);
+  min-width:0;
+}
+.issue-top{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-bottom:7px}
+.issue-dept{
+  display:flex;align-items:center;gap:8px;min-width:0;
+  font-size:12.5px;font-weight:800;letter-spacing:-.01em;color:var(--ink-1);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+.mchip.mchip-sm{width:24px;height:24px;border-radius:8px;box-shadow:inset 0 1px 0 rgba(255,255,255,.4), 0 2px 5px rgba(40,40,70,.16)}
+.mchip.mchip-sm svg{width:13px;height:13px}
+
+.issue-tags{display:flex;align-items:center;gap:6px;flex-shrink:0}
+.issue-sev,.issue-st{
+  border-radius:999px;padding:3px 9px;font-size:10.5px;font-weight:800;
+  letter-spacing:.01em;white-space:nowrap;
+}
+.issue-sev{background:#EDF0F3;color:var(--ink-2)}
+.issue-sev.sev-low{background:rgba(52,199,89,.13);color:#2E9E52}
+.issue-sev.sev-medium{background:rgba(255,159,28,.16);color:#B9720B}
+.issue-sev.sev-high{background:rgba(255,107,74,.15);color:#D3502F}
+.issue-st.st-open{background:rgba(255,107,74,.15);color:#D3502F}
+.issue-st.st-done{background:rgba(52,199,89,.13);color:#2E9E52}
+
+.issue-text{font-size:13px;line-height:1.45;color:var(--ink-1);font-weight:500;white-space:pre-line;overflow-wrap:anywhere}
+.issue-meta{margin-top:7px;font-size:11.5px;font-weight:600;color:var(--ink-3);overflow-wrap:anywhere}
+
+/* Дэлгэрэнгүй самбар дахь асуудлын мөр */
+.detail-issue{
+  margin:10px 2px 0;padding:9px 12px;border-radius:11px;font-size:13px;font-weight:600;
+  background:rgba(255,107,74,.08);color:#B9431F;
+}
+
+@media(max-width:900px){
+  .issue-list{grid-template-columns:1fr}
+  .cards .card-full.card-issues{gap:0}
+}
+
+/* Form дотор бүлэг тусгаарлах гарчиг (жишээ нь Асуудлын бүртгэл) */
+.form-sep{
+  display:flex;flex-direction:column;gap:3px;margin:8px 0 0;padding-top:16px;
+  border-top:1px solid var(--hairline);
+}
+.form-sep span{font-size:12.5px;font-weight:800;letter-spacing:-.01em;color:var(--ink-1)}
+.form-sep small{font-size:11.5px;font-weight:500;color:var(--ink-3);line-height:1.4}
+.form-sep span::before{content:'';display:inline-block;width:7px;height:7px;border-radius:50%;background:#FF6B4A;margin-right:7px;vertical-align:middle}
+
+/* Нарийн дэлгэц: хэлтсийн нэр бүтнээрээ, тэмдэглэгээ доор нь буунa */
+@media(max-width:520px){
+  .issue-top{flex-wrap:wrap;gap:6px}
+  .issue-dept{flex:1 0 auto}
+  .issue-tags{flex:0 0 auto}
 }

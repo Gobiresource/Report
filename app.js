@@ -62,6 +62,18 @@ const CONFIG = (() => {
     return t;
   }
 
+  /* Хэлтэс бүрийн тайланд нэмэгдэх нийтлэг "асуудал" талбарууд.
+     Самбарын Асуудал хэсэгт эдгээрийг хэлтсээр нь ялган нэг дор нэгтгэж харуулна.
+     reports.data_json чөлөөт JSON тул нэмэлт талбарт migration хэрэггүй. */
+  const ISSUE_FIELDS = [
+    {type:'sep', group:'issue', full:true, label:'Асуудлын бүртгэл',
+      hint:'Бичсэн асуудал самбарын «Асуудал» хэсэгт хэлтсээрээ ялгарч харагдана. Асуудал байхгүй бол хоосон үлдээнэ.'},
+    {name:'issue_text', label:'Тухайн өдрийн асуудал', type:'textarea', full:true, group:'issue',
+      placeholder:'Юу тохиолдсон, ямар нөлөө үзүүлсэн бэ?'},
+    {name:'issue_severity', label:'Асуудлын ноцтой байдал', type:'select', group:'issue',
+      options:[['','— Асуудалгүй —'],['low','Бага'],['medium','Дунд'],['high','Өндөр']]}
+  ];
+
   const forms = {
     production: [
       {name:'shift_day_product_ton',   label:'Өдрийн ээлжийн бүтээгдэхүүн / тн', type:'number'},
@@ -74,17 +86,20 @@ const CONFIG = (() => {
       {name:'lab_avg_luojing_ad', label:'Лаб дундаж: Лоожин Ad',   type:'number'},
       {name:'lab_avg_fumei_ad',   label:'Лаб дундаж: Фумэй Ad',    type:'number'},
       {name:'lab_avg_caking_g',   label:'Лаб дундаж: Барьцалдах G',type:'number'},
-      {name:'note', label:'Тайлбар', type:'textarea', full:true}
+      {name:'note', label:'Тайлбар', type:'textarea', full:true},
+      ...ISSUE_FIELDS
     ],
     transport: [
       {name:'weighbridge_net_ton', label:'Пүүний бодит цэвэр жин / тн', type:'number'},
       {name:'weighbridge_trips',   label:'Пүүний рейс', type:'number'},
-      {name:'note', label:'Тайлбар', type:'textarea', full:true}
+      {name:'note', label:'Тайлбар', type:'textarea', full:true},
+      ...ISSUE_FIELDS
     ],
     fuel: [
       {name:'fuel_opening_liter', label:'Эхний үлдэгдэл / л (өмнөх өдрөөс автоматаар)', type:'number'},
       {name:'fuel_income_liter',  label:'Орлого / л (татан авалт)', type:'number'},
-      {name:'note', label:'Тайлбар', type:'textarea', full:true}
+      {name:'note', label:'Тайлбар', type:'textarea', full:true},
+      ...ISSUE_FIELDS
     ],
     equipment: [
       {name:'main_working_count', label:'Үндсэн техник ажилласан', type:'number'},
@@ -92,7 +107,8 @@ const CONFIG = (() => {
       {name:'product_transport_working_count', label:'Бүтээгдэхүүн тээврийн түрээс ажилласан', type:'number'},
       {name:'repair_count', label:'Засвартай техник', type:'number'},
       {name:'parked_count', label:'Парк дээр', type:'number'},
-      {name:'equipment_note', label:'Засвартай техникүүд / тайлбар', type:'textarea', full:true}
+      {name:'equipment_note', label:'Засвартай техникүүд / тайлбар', type:'textarea', full:true},
+      ...ISSUE_FIELDS
     ],
     camp: [
       {name:'mongolian_count', label:'Монгол ажилтан', type:'number'},
@@ -102,7 +118,8 @@ const CONFIG = (() => {
       {name:'outside_meal_count', label:'Гаднаас хооллосон хүн', type:'number'},
       {name:'contractor_count',   label:'Барилга / туслан гүйцэтгэгч', type:'number'},
       {name:'camp_staff_count',   label:'Кемпийн ажилтан', type:'number'},
-      {name:'note', label:'Тайлбар', type:'textarea', full:true}
+      {name:'note', label:'Тайлбар', type:'textarea', full:true},
+      ...ISSUE_FIELDS
     ],
     hse: [
       {name:'medical_assistance_count', label:'Эмнэлгийн тусламж', type:'number'},
@@ -111,7 +128,8 @@ const CONFIG = (() => {
       {name:'night_temp_c', label:'Шөнийн хэм ℃', type:'number'},
       {name:'humidity_percent', label:'Чийг %', type:'number'},
       {name:'wind_speed_ms',    label:'Салхины хурд м/с', type:'number'},
-      {name:'note', label:'Тайлбар', type:'textarea', full:true}
+      {name:'note', label:'Тайлбар', type:'textarea', full:true},
+      ...ISSUE_FIELDS
     ],
     issue: [
       {name:'issue_text', label:'Асуудлын тайлбар', type:'textarea', full:true},
@@ -128,7 +146,8 @@ const CONFIG = (() => {
     {
       key:'production', label:'24 цагийн бүтээгдэхүүн', unit:'тн', featured:true, vizReplacesValue:true,
       calc: d => num(d.shift_day_product_ton) + num(d.shift_night_product_ton),
-      sub: d => `Өдөр ${num(d.shift_day_product_ton)} + Шөнө ${num(d.shift_night_product_ton)}`,
+      // Ээлжийн задаргаа нь заалтын доорх мөрөнд шингэсэн тул давхардуулахгүй
+      sub: d => '',
       mini: d => [
         {label:'Өдөр', value:num(d.shift_day_product_ton)},
         {label:'Шөнө', value:num(d.shift_night_product_ton)}
@@ -136,29 +155,40 @@ const CONFIG = (() => {
       viz: (d, ctx) => {
         const val = num(d.shift_day_product_ton) + num(d.shift_night_product_ton);
         const planMonth = ctx && ctx.plan ? num(ctx.plan.production_ton) : 0;
-        let target = null, label = 'Баяжуулсан бүтээгдэхүүн';
+        let target = null;
         if(planMonth > 0 && ctx.date){
           const dt = new Date(ctx.date + 'T00:00:00');
           const days = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate();
-          target = planMonth / days;
-          label = 'Төлөвлөгөөний дундаж ' + UI.fmt(target) + ' тн/өдөр';
+          target = planMonth / days;   // өдрийн норм
         }
-        return UI.gaugeHtml(val, target, label, 'тн');
+        // Нумын доорх мөр: зүүн талд өдрийн зорилт, баруун талд биелэлтийн хувь
+        const opts = target > 0
+          ? {
+              leftText: 'Өдрийн зорилт · ' + UI.fmt(Math.round(target)) + ' т',
+              rightText: 'Биелэлт <b>' + Math.round(val / target * 100) + '%</b>'
+            }
+          : {
+              leftText: 'Өдөр ' + UI.fmt(num(d.shift_day_product_ton)) + ' + Шөнө ' + UI.fmt(num(d.shift_night_product_ton)),
+              rightText: 'Төлөвлөгөө оруулаагүй'
+            };
+        return UI.gaugeHtml(val, target, '', 'тонн', opts);
       }
     },
     {
       key:'transport', label:'Тээвэр', unit:'тн', vizReplacesValue:true,
       // Богино рейс нь Бүтээгдэхүүн тээврийн хэсэг (хашаан доторх), Хаягдал тусдаа
       calc: d => num(d.sludge_ton) + num(d.waste_ton) + num(d.short_waste_ton) + num(d.product_transport_ton),
-      sub: d => `Шлам ${num(d.sludge_ton)} · Хаягдал ${num(d.waste_ton)} · Бүт. ${num(d.product_transport_ton)+num(d.short_waste_ton)}`,
+      // Задаргаа legend дээр бүрэн харагдана — доор давхардуулахгүй
+      sub: d => '',
       viz: d => UI.donutHtml([
-        {label:'Шлам', value:num(d.sludge_ton), color:'var(--c-fuel)'},
-        {label:'Хаягдал', value:num(d.waste_ton), color:'var(--c-issue)'},
-        {label:'Бүтээгдэхүүн', value:num(d.product_transport_ton)+num(d.short_waste_ton), color:'var(--c-transport)'}
-      ], UI.fmt(num(d.sludge_ton)+num(d.waste_ton)+num(d.short_waste_ton)+num(d.product_transport_ton)), 'Нийт тн', {compact:true, badges:true})
+        {label:'Шлам', value:num(d.sludge_ton), color:'#3B2FE0', icon:UI.MAT_ICONS.sludge},
+        {label:'Хаягдал', value:num(d.waste_ton), color:'#9BA3A9', icon:UI.MAT_ICONS.waste},
+        {label:'Бүтээгдэхүүн', value:num(d.product_transport_ton)+num(d.short_waste_ton), color:'#FF9500', icon:UI.MAT_ICONS.product}
+      ], UI.fmt(num(d.sludge_ton)+num(d.waste_ton)+num(d.short_waste_ton)+num(d.product_transport_ton)),
+         '', {unit:'тн'})
     },
     {
-      key:'fuel', label:'Түлшний зарлага', unit:'л', miniStyle:'hbars',
+      key:'fuel', label:'Түлшний зарлага', unit:'л', miniStyle:'stats',
       calc: d => d.fuel_expense_liter !== undefined && d.fuel_expense_liter !== null
         ? num(d.fuel_expense_liter)
         : num(d.fuel_truck_machine_liter) + num(d.fuel_truck_plant_liter) + num(d.reserve_tank_expense_liter),
@@ -166,7 +196,8 @@ const CONFIG = (() => {
         const closing = (d.fuel_closing_liter !== undefined && d.fuel_closing_liter !== null)
           ? num(d.fuel_closing_liter)
           : num(d.fuel_truck_closing_liter) + num(d.reserve_tank_closing_liter);
-        return closing < 0 ? `⚠ Үлдэгдэл ${closing} л — СӨРӨГ` : `Үлдэгдэл ${closing} л`;
+        // Үлдэгдэл нь барын мөрөнд харагдана — зөвхөн сөрөг үед анхааруулна
+        return closing < 0 ? `⚠ Үлдэгдэл ${UI.fmt(closing)} л — СӨРӨГ` : '';
       },
       warnIf: d => {
         const closing = (d.fuel_closing_liter !== undefined && d.fuel_closing_liter !== null)
@@ -179,10 +210,13 @@ const CONFIG = (() => {
         const closing = (d.fuel_closing_liter !== undefined && d.fuel_closing_liter !== null)
           ? num(d.fuel_closing_liter)
           : num(d.fuel_truck_closing_liter) + num(d.reserve_tank_closing_liter);
+        const income = num(d.fuel_income_liter !== undefined ? d.fuel_income_liter : d.fuel_truck_income_liter);
+        const expense = (d.fuel_expense_liter != null) ? num(d.fuel_expense_liter)
+          : num(d.fuel_truck_machine_liter) + num(d.fuel_truck_plant_liter) + num(d.reserve_tank_expense_liter);
         return [
-          {label:'Орлого', value:num(d.fuel_income_liter !== undefined ? d.fuel_income_liter : d.fuel_truck_income_liter), color:'var(--c-camp)'},
-          {label:'Зарлага', value:(d.fuel_expense_liter != null) ? num(d.fuel_expense_liter) : num(d.fuel_truck_machine_liter)+num(d.fuel_truck_plant_liter)+num(d.reserve_tank_expense_liter), color:'var(--c-transport)'},
-          {label:'Үлдэгдэл', value:Math.max(closing,0), color: closing < 0 ? 'var(--warn)' : 'var(--c-production)'}
+          {label:'Орлого',   value:income,  unit:'л'},
+          {label:'Зарлага',  value:expense, unit:'л'},
+          {label:'Үлдэгдэл', value:closing, unit:'л', warn: closing < 0}
         ];
       }
     },
@@ -215,13 +249,9 @@ const CONFIG = (() => {
         {label:'Зөрчил', value:num(d.hse_violation_count), tone:'bad'},
         {label:'Эмнэлэг', value:num(d.medical_assistance_count), tone:'mid'}
       ]
-    },
-    {
-      key:'issue', label:'Асуудал', unit:'', lowerBetter:true, fullRow:true,
-      calc: d => d.issue_text ? 1 : 0,
-      sub: d => d.status === 'open' ? 'Нээлттэй асуудал байна' : (d.issue_text ? 'Шийдэгдсэн' : 'Бүртгэл алга'),
-      warnIf: d => d.status === 'open'
     }
+    // Асуудлын карт нь бүх хэлтсийн тайланг нэгтгэдэг тул энд биш,
+    // renderSummaryCards доторх issuesCard()-аар тусад нь үүснэ.
   ];
 
   return {reportTypes, forms, summaryCards, num, purposeLabels, ownershipLabels, ownershipColors, OWNERSHIP_ORDER, transportTotals};
@@ -342,40 +372,68 @@ const UI = (() => {
     return `${d.getFullYear()} оны ${MN_MONTHS[d.getMonth()]}ын ${d.getDate()}, ${MN_DAYS[d.getDay()]} гараг`;
   }
 
-  /** SVG donut chart: segments = [{label, value, color}]; opts = {compact, badges} */
+  /** Тээврийн төрлүүдийн дүрс — transport-icons/ доторх бэлэн SVG asset-ууд.
+      Эдгээрийг өөр дүрсээр солихгүй, SVG-ийн дотор талд хүрэхгүй. */
+  const MAT_ICONS = {
+    sludge:  '<img class="transport-type-icon" src="transport-icons/sludge-bed.svg" alt="" aria-hidden="true">',
+    waste:   '<img class="transport-type-icon" src="transport-icons/waste-pile.svg" alt="" aria-hidden="true">',
+    product: '<img class="transport-type-icon" src="transport-icons/product-coal.svg" alt="" aria-hidden="true">'
+  };
+
+  /** V18 — Материалын урсгалын donut: сегмент бүр дээр хувийн badge,
+      баруун талд дүрслэлтэй legend. segments = [{label, value, color, icon}]
+      opts = {unit, plain} — plain=true бол хуучин энгийн (badge-гүй) хэлбэр. */
   function donutHtml(segments, centerTop, centerBottom, opts = {}){
     const total = segments.reduce((a,s) => a + s.value, 0);
     if(total <= 0) return '';
-    const R = 40, C = 2 * Math.PI * R;
-    let offset = 0;
-    let badges = '';
-    const arcs = segments.filter(s => s.value > 0).map(s => {
+    const CX = 108, CY = 108, R = 75, SW = 28, C = 2 * Math.PI * R;
+    const GAP = total > 0 ? 5 : 0;   // сегмент хоорондын завсар (нумын нэгжээр)
+    let offset = 0, arcs = '', badges = '';
+    segments.filter(s => s.value > 0).forEach(s => {
       const frac = s.value / total;
-      const dash = frac * C;
-      const el = `<circle cx="50" cy="50" r="${R}" fill="none" stroke="${s.color}" stroke-width="13"
-        stroke-dasharray="${dash.toFixed(2)} ${(C-dash).toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}"
+      const dash = Math.max(frac * C - GAP, 1.5);
+      arcs += `<circle cx="${CX}" cy="${CY}" r="${R}" fill="none" stroke="${s.color}" stroke-width="${SW}"
+        stroke-dasharray="${dash.toFixed(2)} ${(C - dash).toFixed(2)}" stroke-dashoffset="${(-offset).toFixed(2)}"
         stroke-linecap="butt"/>`;
-      // Сегментийн голд хувь заасан badge (лавлагааны 63/19/41 загвар)
-      if(opts.badges && frac >= 0.07){
-        const midFrac = (offset + dash/2) / C;
-        const ang = midFrac * 2 * Math.PI - Math.PI/2;
-        const bx = 50 + 47 * Math.cos(ang), by = 50 + 47 * Math.sin(ang);
-        badges += `<g><circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="9" fill="${s.color}" class="donut-badge-c"/>
+      if(frac >= 0.06){
+        const ang = ((offset + frac * C / 2) / C) * 2 * Math.PI - Math.PI / 2;
+        const bx = CX + R * Math.cos(ang), by = CY + R * Math.sin(ang);
+        badges += `<g><circle cx="${bx.toFixed(1)}" cy="${by.toFixed(1)}" r="18.5" fill="${s.color}" stroke="#fff" stroke-width="3.4"/>
           <text x="${bx.toFixed(1)}" y="${by.toFixed(1)}" class="donut-badge-t" text-anchor="middle" dominant-baseline="central">${Math.round(frac*100)}%</text></g>`;
       }
-      offset += dash;
-      return el;
-    }).join('');
+      offset += frac * C;
+    });
+    // Голын тоо — нүхэнд багтах фонтын хэмжээг тоон уртаас нь тооцно.
+    // Нүхний диаметр = 2*(R - SW/2); тоо ихсэх тусам үсэг автоматаар багасна.
+    const numTxt = String(centerTop);
+    const nDigits = (numTxt.match(/[0-9]/g) || []).length;
+    const nSeps = numTxt.length - nDigits;
+    const emW = nDigits * 0.60 + nSeps * 0.30 || 1;
+    const holeW = (2 * (R - SW / 2)) * 0.88;
+    const fitFs = Math.max(16, Math.min(44, Math.floor(holeW / emW)));
+
     const legend = segments.map(s => {
       const pct = total ? Math.round(s.value/total*100) : 0;
-      return `<div class="donut-leg"><span class="donut-dot" style="background:${s.color}"></span>
+      const ic = s.icon
+        ? `<span class="donut-ic">${s.icon}</span>`
+        : `<span class="donut-dot" style="background:${s.color}"></span>`;
+      return `<div class="donut-leg">${ic}
         <span class="donut-leg-label">${esc(s.label)}</span>
         <span class="donut-leg-val">${fmt(s.value)} <small>(${pct}%)</small></span></div>`;
     }).join('');
-    return `<div class="donut-wrap ${opts.compact ? 'donut-compact' : ''}">
+    return `<div class="donut-wrap ${opts.plain ? 'donut-plain' : ''}">
       <div class="donut-fig">
-        <svg viewBox="-8 -8 116 116" class="donut-svg"><g transform="rotate(-90 50 50)">${arcs}</g>${badges}</svg>
-        <div class="donut-center"><b>${esc(centerTop)}</b><small>${esc(centerBottom||'')}</small></div>
+        <svg width="216" height="216" viewBox="0 0 216 216" class="donut-svg" role="img"
+             aria-label="${esc(String(centerTop) + ' ' + (centerBottom || ''))}">
+          <g transform="rotate(-90 ${CX} ${CY})">${arcs}</g>${opts.plain ? '' : badges}
+        </svg>
+        <div class="donut-center" style="--dn-fs:${fitFs}px">
+          <b class="donut-num">${esc(centerTop)}</b>
+          ${(centerBottom || opts.unit) ? `<div class="donut-sub">
+            ${centerBottom ? `<span>${esc(centerBottom)}</span>` : ''}
+            ${opts.unit ? `<small>${esc(opts.unit)}</small>` : ''}
+          </div>` : ''}
+        </div>
       </div>
       <div class="donut-legend">${legend}</div>
     </div>`;
@@ -396,36 +454,63 @@ const UI = (() => {
     }).join('') + `</div>`;
   }
 
-  /** Хагас дугуй gauge: гэрэлтсэн хуваарь + богино заагч нь value-г, алтан хуваарь нь target-ыг заана.
-      Тоо нуман дотроо, тайлбар нь графикийн ДООР тусдаа мөрөнд — хэзээ ч давхарлахгүй. */
-  function gaugeHtml(value, target, caption, unit){
-    const max = Math.max(target ? target * 2 : 0, value * 1.15, 1);
-    const frac = Math.min(Math.max(value / max, 0), 1);
-    const tFrac = target ? Math.min(target / max, 1) : null;
-    const N = 29, cx = 100, cy = 92, r1 = 66, r2 = 88;
+  /** V18 — Спидометр заалт.
+      Өдрийн норм = сарын төлөвлөгөө / сарын хоногийн тоо (target аргумент).
+      Нум нормын биелэлтээр дүүрч, өнгө нь УЛААНААС НОГООН руу шилжинэ —
+      100%-д хүрэхэд нум бүтэн, үзүүр нь ногоон болно. Давсан үед нум дүүрэн
+      хэвээр, харин «Биелэлт» тоо давсан хувиараа (105% г.м.) гарна.
+      opts: {goalLabel, leftText, rightText} — нумын доорх мөрийн текст. */
+  let gaugeSeq = 0;
+  function gaugeHtml(value, target, caption, unit, opts){
+    const o = opts || {};
+    const CX = 115, CY = 118, R = 92, L = Math.PI * R;
+    const frac = target > 0 ? Math.min(Math.max(value / target, 0), 1) : 0;
+    const pct = target > 0 ? Math.round((value / target) * 100) : null;
+    const gid = 'ggr' + (++gaugeSeq);
+
+    // Хуваарийн зураас — 13 ширхэг, 3 дахь бүр нь урт
     let ticks = '';
-    for(let i = 0; i < N; i++){
-      const f = i / (N - 1);
-      const a = Math.PI * (1 - f); // 180° -> 0°
-      const x1 = cx + r1 * Math.cos(a), y1 = cy - r1 * Math.sin(a);
-      const x2 = cx + r2 * Math.cos(a), y2 = cy - r2 * Math.sin(a);
-      const on = f <= frac;
-      const isTarget = tFrac !== null && Math.abs(f - tFrac) < (0.5 / (N - 1));
-      ticks += `<line x1="${x1.toFixed(1)}" y1="${y1.toFixed(1)}" x2="${x2.toFixed(1)}" y2="${y2.toFixed(1)}"
-        class="gauge-tick ${on ? 'on' : ''} ${isTarget ? 'target' : ''}"/>`;
+    for(let i = 0; i <= 12; i++){
+      const a = Math.PI * (1 - i / 12);
+      const major = (i % 3 === 0);
+      const r1 = major ? 64 : 69, r2 = 78;
+      ticks += `<line x1="${(CX + r1 * Math.cos(a)).toFixed(1)}" y1="${(CY - r1 * Math.sin(a)).toFixed(1)}"
+        x2="${(CX + r2 * Math.cos(a)).toFixed(1)}" y2="${(CY - r2 * Math.sin(a)).toFixed(1)}"
+        class="gauge-tick ${major ? 'major' : ''}"/>`;
     }
-    // Богино заагч — хуваарийн дотоод захад (r 50–61), голын тоотой огтлолцохгүй
+    // Одоогийн байрлалыг заах цагаан цагираг
     const na = Math.PI * (1 - frac);
-    const px1 = cx + 50 * Math.cos(na), py1 = cy - 50 * Math.sin(na);
-    const px2 = cx + 61 * Math.cos(na), py2 = cy - 61 * Math.sin(na);
+    const dotX = (CX + R * Math.cos(na)).toFixed(1), dotY = (CY - R * Math.sin(na)).toFixed(1);
+
+    const arc = 'M23 118 A92 92 0 0 1 207 118';
+    const foot = (o.leftText || o.rightText)
+      ? `<div class="gauge-foot">
+           <span>${esc(o.leftText || '')}</span>
+           <span>${o.rightText || ''}</span>
+         </div>`
+      : '';
+
     return `<div class="gauge-wrap">
       <div class="gauge-fig">
-        <svg viewBox="0 0 200 96" class="gauge-svg">
+        <svg viewBox="0 0 230 134" class="gauge-svg" role="img"
+             aria-label="${esc(fmt(value) + ' ' + (unit || '') + (pct !== null ? ', өдрийн нормын ' + pct + ' хувь' : ''))}">
+          <defs>
+            <linearGradient id="${gid}" x1="0" y1="0" x2="1" y2="0">
+              <stop offset="0%"   stop-color="#FF6A5A"/>
+              <stop offset="32%"  stop-color="#FF9F1C"/>
+              <stop offset="64%"  stop-color="#F5DA3E"/>
+              <stop offset="100%" stop-color="#3DDC6B"/>
+            </linearGradient>
+          </defs>
+          <path d="${arc}" fill="none" class="gauge-track" stroke-width="11" stroke-linecap="round"/>
           ${ticks}
-          <line x1="${px1.toFixed(1)}" y1="${py1.toFixed(1)}" x2="${px2.toFixed(1)}" y2="${py2.toFixed(1)}" class="gauge-needle"/>
+          ${frac > 0 ? `<path d="${arc}" fill="none" stroke="url(#${gid})" stroke-width="11" stroke-linecap="round"
+              stroke-dasharray="${(frac * L).toFixed(1)} ${(L + 20).toFixed(1)}"/>` : ''}
+          ${target > 0 ? `<circle cx="${dotX}" cy="${dotY}" r="7" class="gauge-dot" stroke-width="4.5"/>` : ''}
         </svg>
         <div class="gauge-center"><b class="count" data-count="${value}">${fmt(value)}</b>${unit ? `<span class="gauge-unit">${esc(unit)}</span>` : ''}</div>
       </div>
+      ${foot}
       ${caption ? `<div class="gauge-caption">${esc(caption)}</div>` : ''}
     </div>`;
   }
@@ -446,10 +531,30 @@ const UI = (() => {
       <div class="seg-legend">${d.map(i =>
         `<span class="sl"><i style="background:${i.color || 'var(--brand)'}"></i>${esc(i.label)} <b>${fmt(i.value)}</b></span>`).join('')}</div>`;
     }
+    if(style === 'stats'){
+      // Харьцуулах суурь (норм/дундаж) байхгүй үзүүлэлтүүд — зөвхөн тоо, баргүй
+      return `<div class="stat-rows">${items.map(i =>
+        `<div class="stat-row${i.warn ? ' neg' : ''}">
+          <span class="sr-l">${esc(i.label)}</span>
+          <span class="sr-v">${fmt(i.value)}${i.unit ? ` <small>${esc(i.unit)}</small>` : ''}</span>
+        </div>`).join('')}</div>`;
+    }
     if(style === 'hbars'){
+      // V18 — өнгөний шилжилттэй pill бар, үзүүрт нь цагаан товгор.
+      // item: {label, value, unit, grad:[a,b], frac} — frac өгөгдвөл өөрийн хуваарь.
       const mx = Math.max(...items.map(i => i.value), 1);
-      return `<div class="hbar-list">${items.map(i =>
-        `<div class="hbar-row"><span class="hl">${esc(i.label)}</span><span class="hbar-track"><span class="hbar-fill" style="width:${Math.max(i.value/mx*100, 2).toFixed(1)}%;background:${i.color || 'var(--brand)'}"></span></span><span class="hbar-val">${fmtShort(i.value)}</span></div>`).join('')}</div>`;
+      return `<div class="hbar-list">${items.map(i => {
+        const f = (i.frac !== undefined && i.frac !== null) ? i.frac : (i.value / mx);
+        const w = Math.max(Math.min(f, 1) * 100, 4);
+        const bg = i.grad
+          ? `linear-gradient(90deg, ${i.grad[0]} 0%, ${i.grad[1]} 100%)`
+          : (i.color || 'var(--brand)');
+        return `<div class="hbar-row">
+          <span class="hl">${esc(i.label)}</span>
+          <span class="hbar-track"><span class="hbar-fill" style="width:${w.toFixed(1)}%;background:${bg}"><i class="hbar-knob"></i></span></span>
+          <span class="hbar-val">${fmt(i.value)}${i.unit ? ` <small>${esc(i.unit)}</small>` : ''}</span>
+        </div>`;
+      }).join('')}</div>`;
     }
     if(style === 'chips'){
       const active = items.filter(i => i.value > 0);
@@ -509,7 +614,7 @@ const UI = (() => {
     </svg></div>`;
   }
 
-  return {esc, today, thisMonth, $, $$, fmt, fmtShort, alertBox, paintUserChrome, animateCounts, formatDateMn, donutHtml, barListHtml, gaugeHtml, waveChartHtml, miniViz};
+  return {esc, today, thisMonth, $, $$, fmt, fmtShort, alertBox, paintUserChrome, animateCounts, formatDateMn, donutHtml, barListHtml, gaugeHtml, waveChartHtml, miniViz, MAT_ICONS};
 })();
 
 /* ================================================================
@@ -662,6 +767,79 @@ const PageDashboard = () => {
     UI.$$('.status-dial.lit').forEach(btn => btn.onclick = () => renderModuleDetail(btn.dataset.key));
   }
 
+  /* ---------------- Асуудлын нэгтгэл ----------------
+     Хэлтэс бүрийн тайлангийн issue_text-ийг цуглуулж, ноцтой байдлаар нь
+     эрэмбэлэн, хэлтсийн өнгө/icon-оор ялгаж нэг картад харуулна. */
+  const SEV_LABEL = {low:'Бага', medium:'Дунд', high:'Өндөр'};
+  const SEV_RANK  = {high:0, medium:1, low:2};
+
+  function collectIssues(){
+    const out = [];
+    CONFIG.reportTypes.forEach(t => {
+      const r = dailyMap[t.key];
+      if(!r || !r.data) return;
+      const text = String(r.data.issue_text || '').trim();
+      if(!text) return;
+      const isIssueModule = t.key === 'issue';
+      out.push({
+        key: t.key,
+        name: isIssueModule ? 'Ерөнхий асуудал' : t.name,
+        color: t.color,
+        icon: t.icon,
+        text: text,
+        sev: r.data.issue_severity || r.data.severity || '',
+        status: isIssueModule ? (r.data.status || '') : '',
+        action: isIssueModule ? String(r.data.action_taken || '').trim() : '',
+        person: isIssueModule ? String(r.data.responsible_person || '').trim() : ''
+      });
+    });
+    return out.sort((a, b) => {
+      const ra = SEV_RANK[a.sev] === undefined ? 3 : SEV_RANK[a.sev];
+      const rb = SEV_RANK[b.sev] === undefined ? 3 : SEV_RANK[b.sev];
+      return ra - rb;
+    });
+  }
+
+  function issuesCard(){
+    const type = CONFIG.reportTypes.find(t => t.key === 'issue') || {};
+    const chip = `<span class="mchip" style="background:${type.color}">${type.icon || ''}</span>`;
+    const items = collectIssues();
+    const arrived = CONFIG.reportTypes.filter(t => dailyMap[t.key]).length;
+
+    if(!items.length){
+      return `<div class="bezel card card-full card-issues"><span class="tick-a"></span><span class="tick-b"></span>
+        <div class="card-tag-row"><span class="label">${chip}Асуудал</span>
+          <span class="issue-tally ok">Асуудалгүй</span></div>
+        <div class="issue-none">Ирсэн ${arrived} тайлангийн аль нь ч асуудал тэмдэглээгүй байна.</div>
+      </div>`;
+    }
+
+    const high = items.filter(i => i.sev === 'high').length;
+    const rows = items.map(i => {
+      const sevTag = i.sev
+        ? `<span class="issue-sev sev-${UI.esc(i.sev)}">${UI.esc(SEV_LABEL[i.sev] || i.sev)}</span>` : '';
+      const stTag = i.status
+        ? `<span class="issue-st ${i.status === 'open' ? 'st-open' : 'st-done'}">${i.status === 'open' ? 'Нээлттэй' : 'Шийдсэн'}</span>` : '';
+      const meta = [];
+      if(i.action) meta.push('Авсан арга хэмжээ: ' + i.action);
+      if(i.person) meta.push('Хариуцсан: ' + i.person);
+      return `<div class="issue-item" style="--iss:${i.color}">
+        <div class="issue-top">
+          <span class="issue-dept"><span class="mchip mchip-sm" style="background:${i.color}">${i.icon || ''}</span>${UI.esc(i.name)}</span>
+          <span class="issue-tags">${sevTag}${stTag}</span>
+        </div>
+        <div class="issue-text">${UI.esc(i.text)}</div>
+        ${meta.length ? `<div class="issue-meta">${UI.esc(meta.join(' · '))}</div>` : ''}
+      </div>`;
+    }).join('');
+
+    return `<div class="bezel card card-full card-issues${high ? ' card-warn' : ''}"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="card-tag-row"><span class="label">${chip}Асуудал</span>
+        <span class="issue-tally${high ? ' bad' : ''}">${items.length} асуудал${high ? ' · ' + high + ' өндөр' : ''}</span></div>
+      <div class="issue-list">${rows}</div>
+    </div>`;
+  }
+
   function renderSummaryCards(){
     UI.$('#summaryCards').innerHTML = CONFIG.summaryCards.map(c => {
       const r = dailyMap[c.key];
@@ -717,7 +895,7 @@ const PageDashboard = () => {
         ${valueRow}
         ${miniHtml}
         ${subTxt ? `<div class="sub">${UI.esc(subTxt)}</div>` : ''}</div>`;
-    }).join('');
+    }).join('') + issuesCard();
     UI.animateCounts(UI.$('#summaryCards'));
   }
 
@@ -733,7 +911,9 @@ const PageDashboard = () => {
     } else if(key === 'transport' && Array.isArray(r.data.vehicle_rows)){
       body = transportDetailHtml(r.data);
     } else {
-      const fields = CONFIG.forms[key] || [];
+      // Асуудлын талбарууд хоосон бол дэлгэрэнгүйд харуулахгүй (нэгтгэсэн картад аль хэдийн харагдана)
+      const hasIssue = String((r.data && r.data.issue_text) || '').trim() !== '';
+      const fields = (CONFIG.forms[key] || []).filter(f => f.type !== 'sep' && (f.group !== 'issue' || hasIssue));
       const rows = fields.map(f => {
         let v = r.data[f.name];
         if(v === null || v === undefined || v === ''){ v = '—'; }
@@ -821,17 +1001,19 @@ const PageDashboard = () => {
         <thead><tr><th>Машин</th><th>Олгосон / л</th><th>Мото цаг</th><th>Машинд үлдсэн / л</th><th>Рейс</th><th>Тонн</th><th>л/тонн</th></tr></thead>
         <tbody>${rows || '<tr><td colspan="7" class="muted">Машины мөр байхгүй</td></tr>'}</tbody>
       </table></div>
-      ${d.note ? `<p class="muted" style="margin:12px 2px 0;font-size:13px">Тайлбар: ${UI.esc(d.note)}</p>` : ''}`;
+      ${d.note ? `<p class="muted" style="margin:12px 2px 0;font-size:13px">Тайлбар: ${UI.esc(d.note)}</p>` : ''}
+      ${d.issue_text ? `<p class="detail-issue">Асуудал: ${UI.esc(d.issue_text)}</p>` : ''}`;
   }
 
   /** Тээврийн дэлгэрэнгүй: donut + зориулалтын нийлбэр + машин бүрийн рейс/тонн */
   function transportDetailHtml(d){
     const n = CONFIG.num;
     const donut = UI.donutHtml([
-      {label:'Шлам', value:n(d.sludge_ton), color:'var(--c-fuel)'},
-      {label:'Хаягдал', value:n(d.waste_ton), color:'var(--c-issue)'},
-      {label:'Бүтээгдэхүүн', value:n(d.product_transport_ton)+n(d.short_waste_ton), color:'var(--c-transport)'}
-    ], UI.fmt(n(d.sludge_ton)+n(d.waste_ton)+n(d.short_waste_ton)+n(d.product_transport_ton)), 'нийт тн');
+      {label:'Шлам', value:n(d.sludge_ton), color:'#3B2FE0', icon:UI.MAT_ICONS.sludge},
+      {label:'Хаягдал', value:n(d.waste_ton), color:'#9BA3A9', icon:UI.MAT_ICONS.waste},
+      {label:'Бүтээгдэхүүн', value:n(d.product_transport_ton)+n(d.short_waste_ton), color:'#FF9500', icon:UI.MAT_ICONS.product}
+    ], UI.fmt(n(d.sludge_ton)+n(d.waste_ton)+n(d.short_waste_ton)+n(d.product_transport_ton)),
+       '', {unit:'тн'});
     const donutBlock = donut ? `<div class="viz-block"><div class="viz-title">Тээврийн бүтэц — тонноор</div>${donut}</div>` : '';
     const rows = (d.vehicle_rows || [])
       .slice()
@@ -854,7 +1036,8 @@ const PageDashboard = () => {
         <thead><tr><th>Машин</th><th>Зориулалт</th><th>Рейс</th><th>Тонн</th></tr></thead>
         <tbody>${rows || '<tr><td colspan="4" class="muted">Машины мөр байхгүй</td></tr>'}</tbody>
       </table></div>
-      ${d.note ? `<p class="muted" style="margin:12px 2px 0;font-size:13px">Тайлбар: ${UI.esc(d.note)}</p>` : ''}`;
+      ${d.note ? `<p class="muted" style="margin:12px 2px 0;font-size:13px">Тайлбар: ${UI.esc(d.note)}</p>` : ''}
+      ${d.issue_text ? `<p class="detail-issue">Асуудал: ${UI.esc(d.issue_text)}</p>` : ''}`;
   }
 
   async function loadMonthly(month){
@@ -869,6 +1052,8 @@ const PageDashboard = () => {
       const sum = (key, field) => (byType[key]||[]).reduce((a,r) => a + CONFIG.num(r.data[field]), 0);
       const count = key => (byType[key]||[]).length;
       const openIssues = (byType['issue']||[]).filter(r => r.data.status === 'open').length;
+      // Асуудлыг бүх хэлтсийн тайлангаас нэгтгэж тоолно (зөвхөн Асуудлын модулиас биш)
+      const monthIssues = (res.reports || []).filter(r => String((r.data && r.data.issue_text) || '').trim() !== '').length;
 
       const fuelIncome = (byType['fuel']||[]).reduce((a,r)=>a+CONFIG.num(r.data.fuel_income_liter!=null?r.data.fuel_income_liter:r.data.fuel_truck_income_liter),0);
 
@@ -1000,10 +1185,10 @@ const PageDashboard = () => {
             <div class="kpi-chips" style="margin-top:2px">
               <span class="kpi-chip ${hseV ? 'bad' : 'ok'}">Зөрчил ${UI.fmt(hseV)}</span>
               <span class="kpi-chip ${hseM ? 'mid' : 'ok'}">Эмнэлэг ${UI.fmt(hseM)}</span>
-              <span class="kpi-chip ${openIssues ? 'bad' : 'ok'}">Нээлттэй асуудал ${openIssues}</span>
+              <span class="kpi-chip ${monthIssues ? 'bad' : 'ok'}">Асуудал ${monthIssues}</span>
             </div>
             ${colsHtml(ser.hse, 'var(--c-transport)')}
-            <div class="plan-foot tb-foot">${count('hse')} ХАБ · ${count('issue')} асуудлын бүртгэл</div>
+            <div class="plan-foot tb-foot">${count('hse')} ХАБ · ${openIssues} нээлттэй асуудал</div>
           </div>
         </div>`;
       UI.animateCounts(box);
@@ -1288,14 +1473,16 @@ const PageReport = () => {
       </div>`;
     }).join('');
 
+    // Тайлбар ба асуудлын талбарууд машины хүснэгтийн ард, төгсгөлд байрлана
+    const isTail = f => f.name === 'note' || f.group === 'issue';
     form.innerHTML =
-      fields.filter(f => f.name !== 'note').map(renderField).join('') +
+      fields.filter(f => !isTail(f)).map(renderField).join('') +
       `<div class="full">
         <label class="block-label">Машин тус бүрийн олголт (олгосон / мото цаг / машинд үлдсэн, литрээр)</label>
         <div class="own-cols">${columns}</div>
       </div>
       <div class="full fuel-summary" id="fuelSummary"></div>` +
-      fields.filter(f => f.name === 'note').map(renderField).join('') +
+      fields.filter(isTail).map(renderField).join('') +
       `<div class="form-actions"><button type="reset" class="btn btn-soft">Цэвэрлэх</button><button type="submit" class="btn btn-primary">Илгээх</button></div>`;
 
     form.addEventListener('input', () => updateFuelSummary(form));
@@ -1455,8 +1642,10 @@ const PageReport = () => {
   }
 
   function renderField(f){
-    const cls = f.full ? 'field full' : 'field';
-    if(f.type === 'textarea') return `<div class="${cls}"><label>${UI.esc(f.label)}</label><textarea name="${f.name}" placeholder="Тайлбар"></textarea></div>`;
+    // Бүлгийн тусгаарлагч — талбар биш, зөвхөн гарчиг
+    if(f.type === 'sep') return `<div class="full form-sep"><span>${UI.esc(f.label)}</span>${f.hint ? `<small>${UI.esc(f.hint)}</small>` : ''}</div>`;
+    const cls = (f.full ? 'field full' : 'field') + (f.group ? ' field-' + f.group : '');
+    if(f.type === 'textarea') return `<div class="${cls}"><label>${UI.esc(f.label)}</label><textarea name="${f.name}" placeholder="${UI.esc(f.placeholder || 'Тайлбар')}"></textarea></div>`;
     if(f.type === 'select') return `<div class="${cls}"><label>${UI.esc(f.label)}</label><select name="${f.name}">${(f.options||[]).map(o=>`<option value="${UI.esc(o[0])}">${UI.esc(o[1])}</option>`).join('')}</select></div>`;
     return `<div class="${cls}"><label>${UI.esc(f.label)}</label><input name="${f.name}" type="${f.type||'text'}" ${f.type==='number'?'step="any"':''}></div>`;
   }

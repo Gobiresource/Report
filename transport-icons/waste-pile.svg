@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 72" role="img" aria-labelledby="title">
+  <title id="title">Хаягдал — чулуулгийн овоолго</title>
+  <g stroke="#343A3F" stroke-width="3" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 58 30 15l21 35 14-28 27 36Z" fill="#969CA0"/>
+    <path d="m30 15 11 19-10 6 8 11H13Z" fill="#C2C6C8"/>
+    <path d="m65 22 11 19-10 4 11 13H50Z" fill="#777E82"/>
+    <path d="m20 38 10-11M52 39l13-17M68 46l8-6" fill="none" opacity=".7"/>
+    <path d="M4 59 13 48l11 11ZM26 60l11-12 14 12ZM69 60l9-10 13 10Z" fill="#B2B7B9"/>
+  </g>
+</svg>

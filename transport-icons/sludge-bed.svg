@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 72" role="img" aria-labelledby="title">
+  <title id="title">Шлам — машины хоосон хойд тэвш</title>
+  <g fill="none" stroke="#4B35D4" stroke-width="3.5" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M10 12h76l-10 40H20L10 12Z" fill="#EEEAFE"/>
+    <path d="M7 9h82v7H7z" fill="#6A55E8"/>
+    <path d="M21 21h54l-7 21H28l-7-21Z" fill="#7563EA"/>
+    <path d="M36 52v8h24v-8"/>
+    <path d="M20 52v11h13V52M63 52v11h13V52" fill="#6A55E8"/>
+    <path d="M25 56v6M29 56v6M67 56v6M71 56v6" opacity=".7"/>
+  </g>
+</svg>

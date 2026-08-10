@@ -1,1 +1,18 @@
-﻿dist/
+# Cloudflare deploy-ийн түр хавтас
+dist/
+.wrangler/
+node_modules/
+
+# Дизайны туршилт, mockup, урьдчилан харах файлууд (эх код биш)
+_mockup_*.html
+_preview_*.html
+_dashboard_live_preview.html
+_gauge_demo.html
+_donut_fit_test.html
+_v20_design_backup.zip
+
+# Лавлах зураг, эх сурвалжийн архив (том хэмжээтэй, кодод шаардлагагүй)
+*-design-reference.png
+*-design-source.zip
+transport-icons-svg.zip
+Codex Image*.png

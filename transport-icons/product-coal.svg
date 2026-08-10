@@ -1,0 +1,14 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 96 72" role="img" aria-labelledby="title">
+  <title id="title">Бүтээгдэхүүн — нүүрсний бөөгнөрөл</title>
+  <g stroke="#252A2E" stroke-width="2.8" stroke-linejoin="round">
+    <path d="m7 51 6-21 16-9 18 9 3 19-14 13-20-2Z" fill="#30363B"/>
+    <path d="m32 24 8-17 18-4 14 13-2 18-17 9-14-8Z" fill="#252B30"/>
+    <path d="m53 47 7-19 17-7 13 12-2 21-15 9-17-4Z" fill="#343A3F"/>
+    <path d="m29 56 7-15 15-5 13 13-5 18-19 2Z" fill="#20262A"/>
+    <path d="m69 57 5-12 11-5 8 8-2 15-12 6Z" fill="#41474B"/>
+    <path d="m14 30 12-7 7 10-10 11Z" fill="#FF9500" stroke="#D97A00"/>
+    <path d="m42 9 14-4 9 10-11 10Z" fill="#FF9500" stroke="#D97A00"/>
+    <path d="m64 30 12-6 8 10-11 10Z" fill="#FF9500" stroke="#D97A00"/>
+    <path d="m37 44 12-5 9 10-10 11Z" fill="#FF9500" stroke="#D97A00"/>
+  </g>
+</svg>
