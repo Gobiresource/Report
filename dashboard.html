@@ -15,6 +15,7 @@
       </a>
       <div class="top-actions">
         <a class="btn btn-soft" href="report.html">Тайлан</a>
+        <a class="btn btn-soft" href="meeting.html">Хурал</a>
         <a id="adminLink" class="btn btn-soft hidden" href="admin.html">Хэрэглэгчид</a>
         <span id="userPill" class="user-pill"></span>
         <button id="logoutBtn" class="btn btn-soft hidden">Гарах</button>
@@ -42,7 +43,7 @@
 
     <section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
       <div class="panel-head">
-        <div><h3>Тайлангийн ирц</h3></div>
+        <div><h3>Тайлангийн ирц</h3><p id="statusSub"></p></div>
         <div id="attendanceRing"></div>
       </div>
       <div id="statusRow" class="status-row"></div>
@@ -57,22 +58,10 @@
 
     <div id="moduleDetail"></div>
 
-    <section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
-      <div class="panel-head">
-        <div><h3>Сарын төлөвлөгөөний биелэлт</h3><p>Үзүүлэлт бүрийг сарын явцтай харьцуулж, өнөөдрийн зорилтыг харуулна.</p></div>
-        <div class="date-tools"><input id="dashboardMonth" type="month" aria-label="Сар сонгох"></div>
-      </div>
-      <div id="planArea"></div>
-    </section>
-
-    <section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
-      <div class="panel-head">
-        <div><h3>Сарын нэгтгэл</h3><p>Түлш, тээвэр, ХАБЭА-ийн сарын нийлбэр, өдөр тутмын задаргаа.</p></div>
-      </div>
-      <div id="monthlyCards"></div>
-    </section>
-
-    <div id="monthlyMachines"></div>
+    <!-- ТҮР ХАССАН (дараа шинэ бүтцэд нэгтгэнэ):
+         Сарын төлөвлөгөөний биелэлт (#planArea),
+         Сарын нэгтгэл (#monthlyCards),
+         Машин тус бүрийн үр бүтээмж (#monthlyMachines) -->
 
   </main>
   <script src="app.js"></script>

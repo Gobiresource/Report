@@ -10,7 +10,7 @@ Set-Location $PSScriptRoot
 
 Remove-Item dist -Recurse -Force -ErrorAction Ignore
 New-Item dist -ItemType Directory | Out-Null
-Copy-Item index.html, dashboard.html, report.html, admin.html, app.js, style.css, logo.png, favicon.png dist\
+Copy-Item index.html, dashboard.html, report.html, admin.html, meeting.html, app.js, style.css, logo.png, favicon.png dist\
 # Тээврийн төрлийн SVG дүрсүүд — картын legend-д хэрэглэгддэг тул заавал орно
 Copy-Item transport-icons dist\ -Recurse
 

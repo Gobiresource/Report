@@ -155,16 +155,17 @@ const CONFIG = (() => {
       viz: (d, ctx) => {
         const val = num(d.shift_day_product_ton) + num(d.shift_night_product_ton);
         const planMonth = ctx && ctx.plan ? num(ctx.plan.production_ton) : 0;
+        const span = (ctx && ctx.span) ? ctx.span : 1;   // сонгосон хугацааны хоног
         let target = null;
         if(planMonth > 0 && ctx.date){
           const dt = new Date(ctx.date + 'T00:00:00');
           const days = new Date(dt.getFullYear(), dt.getMonth() + 1, 0).getDate();
-          target = planMonth / days;   // өдрийн норм
+          target = (planMonth / days) * span;   // өдрийн норм × хоног
         }
-        // Нумын доорх мөр: зүүн талд өдрийн зорилт, баруун талд биелэлтийн хувь
+        // Нумын доорх мөр: зүүн талд зорилт, баруун талд биелэлтийн хувь
         const opts = target > 0
           ? {
-              leftText: 'Өдрийн зорилт · ' + UI.fmt(Math.round(target)) + ' т',
+              leftText: (span > 1 ? 'Хугацааны зорилт · ' : 'Өдрийн зорилт · ') + UI.fmt(Math.round(target)) + ' т',
               rightText: 'Биелэлт <b>' + Math.round(val / target * 100) + '%</b>'
             }
           : {
@@ -305,6 +306,12 @@ const API = (() => {
     userRename: (user_id, new_username, new_name) => call('/api/users/rename', withAuth({user_id, new_username, new_name})),
     userCreate: (new_username, new_name, new_pin, permissions) => call('/api/users/create', withAuth({new_username, new_name, new_pin, permissions})),
     userToggle: (user_id) => call('/api/users/toggle', withAuth({user_id})),
+    meetings: () => call('/api/meetings', withAuth({})),
+    meeting: (date) => call('/api/meeting', withAuth({date})),
+    meetingSave: (date, notes, tasks) => call('/api/meeting/save', withAuth({date, notes, tasks})),
+    myTasks: () => call('/api/tasks/mine', withAuth({})),
+    taskStatus: (task_id, status, worker_note) => call('/api/tasks/status', withAuth({task_id, status, worker_note})),
+    range: (from, to) => call('/api/range', withAuth({from, to})),
     planSave: (month, plan) => call('/api/plan/save', withAuth({month, plan}))
   };
 })();
@@ -652,6 +659,459 @@ const PageLogin = () => {
 };
 
 /* ================================================================
+   KPI КАРТУУД — самбар болон хурлын хуудсанд ижилхэн харагдац.
+   KpiCards.render(box, curMap, prevMap, {plan, date, span})
+   curMap/prevMap = Aggregate.byType(...) буюу нэг өдрийн map.
+   ================================================================ */
+const KpiCards = (() => {
+  const SEV_RANK  = {high:0, medium:1, low:2};
+
+  function collectIssues(dailyMap){
+    const out = [];
+    CONFIG.reportTypes.forEach(t => {
+      const r = dailyMap[t.key];
+      if(!r || !r.data) return;
+      const text = String(r.data.issue_text || '').trim();
+      if(!text) return;
+      const isIssueModule = t.key === 'issue';
+      out.push({
+        key: t.key,
+        name: isIssueModule ? 'Ерөнхий асуудал' : t.name,
+        color: t.color,
+        icon: t.icon,
+        text: text,
+        sev: r.data.issue_severity || r.data.severity || '',
+        status: isIssueModule ? (r.data.status || '') : '',
+        action: isIssueModule ? String(r.data.action_taken || '').trim() : '',
+        person: isIssueModule ? String(r.data.responsible_person || '').trim() : ''
+      });
+    });
+    return out.sort((a, b) => {
+      const ra = SEV_RANK[a.sev] === undefined ? 3 : SEV_RANK[a.sev];
+      const rb = SEV_RANK[b.sev] === undefined ? 3 : SEV_RANK[b.sev];
+      return ra - rb;
+    });
+  }
+
+  function issuesCard(dailyMap){
+    const type = CONFIG.reportTypes.find(t => t.key === 'issue') || {};
+    const chip = `<span class="mchip" style="background:${type.color}">${type.icon || ''}</span>`;
+    const items = collectIssues(dailyMap);
+    const arrived = CONFIG.reportTypes.filter(t => dailyMap[t.key]).length;
+
+    if(!items.length){
+      return `<div class="bezel card card-full card-issues"><span class="tick-a"></span><span class="tick-b"></span>
+        <div class="card-tag-row"><span class="label">${chip}Асуудал</span>
+          <span class="issue-tally ok">Асуудалгүй</span></div>
+        <div class="issue-none">Ирсэн ${arrived} тайлангийн аль нь ч асуудал тэмдэглээгүй байна.</div>
+      </div>`;
+    }
+
+    const high = items.filter(i => i.sev === 'high').length;
+    const rows = items.map(i => {
+      const sevTag = i.sev
+        ? `<span class="issue-sev sev-${UI.esc(i.sev)}">${UI.esc(SEV_LABEL[i.sev] || i.sev)}</span>` : '';
+      const stTag = i.status
+        ? `<span class="issue-st ${i.status === 'open' ? 'st-open' : 'st-done'}">${i.status === 'open' ? 'Нээлттэй' : 'Шийдсэн'}</span>` : '';
+      const meta = [];
+      if(i.action) meta.push('Авсан арга хэмжээ: ' + i.action);
+      if(i.person) meta.push('Хариуцсан: ' + i.person);
+      return `<div class="issue-item" style="--iss:${i.color}">
+        <div class="issue-top">
+          <span class="issue-dept"><span class="mchip mchip-sm" style="background:${i.color}">${i.icon || ''}</span>${UI.esc(i.name)}</span>
+          <span class="issue-tags">${sevTag}${stTag}</span>
+        </div>
+        <div class="issue-text">${UI.esc(i.text)}</div>
+        ${meta.length ? `<div class="issue-meta">${UI.esc(meta.join(' · '))}</div>` : ''}
+      </div>`;
+    }).join('');
+
+    return `<div class="bezel card card-full card-issues${high ? ' card-warn' : ''}"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="card-tag-row"><span class="label">${chip}Асуудал</span>
+        <span class="issue-tally${high ? ' bad' : ''}">${items.length} асуудал${high ? ' · ' + high + ' өндөр' : ''}</span></div>
+      <div class="issue-list">${rows}</div>
+    </div>`;
+  }
+
+  function render(box, dailyMap, dailyPrevMap, opts){
+    if(!box) return;
+    opts = opts || {};
+    const dashPlan = opts.plan || {}, dashDate = opts.date || UI.today(), dashSpan = opts.span || 1;
+    const trendFrom = dashSpan > 1 ? 'өмнөх хугацаанаас' : 'өчигдрөөс';
+    box.innerHTML = CONFIG.summaryCards.map(c => {
+      const r = dailyMap[c.key];
+      const type = CONFIG.reportTypes.find(t => t.key === c.key) || {};
+      const chip = `<span class="mchip" style="background:${type.color}">${type.icon || ''}</span>`;
+      const featured = c.featured ? 'card-featured' : '';
+      const fullRow = c.fullRow ? 'card-full' : '';
+
+      if(!r){
+        return `<div class="bezel card card-missing ${featured} ${fullRow}"><span class="tick-a"></span><span class="tick-b"></span>
+          <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span></div>
+          <div class="value">—</div><div class="sub">Тайлан ороогүй</div></div>`;
+      }
+
+      const val = c.calc(r.data);
+      const warn = c.warnIf ? c.warnIf(r.data) : false;
+
+      // Өмнөх өдрөөс өссөн/буурсан хувь (▲/▼ chip). Бага нь сайн үзүүлэлтэд өнгө урвуулна.
+      let trendChip = '';
+      const prev = dailyPrevMap[c.key];
+      if(prev){
+        const prevVal = c.calc(prev.data);
+        if(prevVal > 0){
+          const pct = Math.round(((val - prevVal) / prevVal) * 100);
+          if(pct !== 0){
+            const up = pct > 0;
+            const good = c.lowerBetter ? !up : up;
+            trendChip = `<span class="trend-chip ${good ? 'trend-good' : 'trend-bad'}">${up ? '▲' : '▼'} ${Math.abs(pct)}%<small>${trendFrom}</small></span>`;
+          } else {
+            trendChip = `<span class="trend-chip trend-flat">— 0%<small>${trendFrom}</small></span>`;
+          }
+        }
+      }
+
+      // Карт доторх визуал: viz hook (gauge/donut) байвал түүнийг,
+      // үгүй бол картын төрөлд тохирсон мини визуал (segments/hbars/chips/pill)
+      let miniHtml = '';
+      if(c.viz){
+        miniHtml = c.viz(r.data, {plan: dashPlan, date: dashDate, span: dashSpan}) || '';
+      } else if(c.mini){
+        miniHtml = UI.miniViz(c.mini(r.data), c.miniStyle);
+      }
+
+      const isViz = c.vizReplacesValue && miniHtml;
+      // Trend chip: энгийн картад том тооны хажууд, viz картад гарчгийн мөрөнд
+      const valueRow = isViz
+        ? ''
+        : `<div class="value-row"><div class="value"><span class="count" data-count="${val}">${UI.fmt(val)}</span>${c.unit ? ' <span class="unit">'+c.unit+'</span>' : ''}</div>${trendChip}</div>`;
+      const wide = (c.viz && miniHtml) ? 'card-wide' : '';
+      const subTxt = c.sub(r.data);
+      return `<div class="bezel card ${warn?'card-warn':''} ${featured} ${wide} ${fullRow}"><span class="tick-a"></span><span class="tick-b"></span>
+        <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span>${isViz ? trendChip : ''}</div>
+        ${valueRow}
+        ${miniHtml}
+        ${subTxt ? `<div class="sub">${UI.esc(subTxt)}</div>` : ''}</div>`;
+    }).join('') + issuesCard(dailyMap);
+    UI.animateCounts(box);
+  }
+
+  return {render};
+})();
+
+/* ================================================================
+   ХУГАЦААНЫ АГРЕГАЦИ — олон өдрийн тайланг НЭГ өдрийн хэлбэрт хувиргана.
+   Ингэснээр самбарын gauge/donut/картууд ямар ч хугацаанд ажиллана.
+
+   Дүрэм: тонн/литр/рейс/зөрчил = НИЙЛБЭР; машин, хүний тоо = ДУНДАЖ
+   (12 өдрийн 32 машиныг нэмбэл 384 болно — утгагүй); түлшний эхний
+   үлдэгдэл = ЭХНИЙ өдрийнх, эцсийн үлдэгдэл = СҮҮЛИЙН өдрийнх;
+   тоолуур, лаб, цаг агаар = ДУНДАЖ.
+   ================================================================ */
+const Aggregate = (() => {
+  const SUM = 'sum', AVG = 'avg', FIRST = 'first', LAST = 'last';
+  const RULES = {
+    production: {
+      shift_day_product_ton:SUM, shift_night_product_ton:SUM,
+      day_fuel_liter:SUM, night_fuel_liter:SUM, middling_ton:SUM,
+      day_meter:LAST, night_meter:LAST,
+      lab_avg_luojing_ad:AVG, lab_avg_fumei_ad:AVG, lab_avg_caking_g:AVG
+    },
+    transport: {
+      sludge_trips:SUM, sludge_ton:SUM, waste_trips:SUM, waste_ton:SUM,
+      short_waste_trips:SUM, short_waste_ton:SUM,
+      product_transport_trips:SUM, product_transport_ton:SUM,
+      weighbridge_net_ton:SUM, weighbridge_trips:SUM
+    },
+    fuel: {
+      fuel_opening_liter:FIRST, fuel_income_liter:SUM,
+      fuel_expense_liter:SUM, fuel_closing_liter:LAST,
+      fuel_truck_income_liter:SUM, fuel_truck_machine_liter:SUM,
+      fuel_truck_plant_liter:SUM, reserve_tank_expense_liter:SUM,
+      fuel_truck_closing_liter:LAST, reserve_tank_closing_liter:LAST
+    },
+    equipment: {
+      main_working_count:AVG, rental_sludge_working_count:AVG,
+      product_transport_working_count:AVG, repair_count:AVG, parked_count:AVG
+    },
+    camp: {
+      mongolian_count:AVG, chinese_count:AVG, guard_count:AVG, guest_count:AVG,
+      outside_meal_count:AVG, contractor_count:AVG, camp_staff_count:AVG
+    },
+    hse: {
+      hse_violation_count:SUM, medical_assistance_count:SUM,
+      day_temp_c:AVG, night_temp_c:AVG, humidity_percent:AVG, wind_speed_ms:AVG
+    },
+    issue: {}
+  };
+  const n = v => { const x = parseFloat(v); return isNaN(x) ? 0 : x; };
+
+  /** reports → {report_type: {data, submitted_by_name, updated_at, _days}} */
+  function byType(reports){
+    const groups = {};
+    (reports || []).forEach(r => { (groups[r.report_type] = groups[r.report_type] || []).push(r); });
+    const out = {};
+    Object.keys(groups).forEach(key => {
+      const list = groups[key].slice().sort((a,b) => (a.date||'').localeCompare(b.date||''));
+      const rules = RULES[key] || {};
+      const data = {};
+      // Бүх талбарыг дүрмээр нь нэгтгэнэ
+      const fields = new Set();
+      list.forEach(r => Object.keys(r.data || {}).forEach(f => fields.add(f)));
+      fields.forEach(f => {
+        const rule = rules[f];
+        if(rule === AVG){
+          const vals = list.map(r => n((r.data||{})[f])).filter((_, i) => (list[i].data||{})[f] != null);
+          data[f] = vals.length ? Math.round((vals.reduce((a,b)=>a+b,0) / vals.length) * 10) / 10 : 0;
+        } else if(rule === FIRST){
+          const hit = list.find(r => (r.data||{})[f] != null);
+          data[f] = hit ? n(hit.data[f]) : 0;
+        } else if(rule === LAST){
+          const hit = [...list].reverse().find(r => (r.data||{})[f] != null);
+          data[f] = hit ? n(hit.data[f]) : 0;
+        } else if(rule === SUM){
+          data[f] = Math.round(list.reduce((a,r) => a + n((r.data||{})[f]), 0) * 10) / 10;
+        }
+      });
+      // Машины мөрүүд — машин бүрээр нэгтгэнэ (үр бүтээмжийн хэсэгт хэрэгтэй)
+      const rowsAll = [];
+      list.forEach(r => (r.data && r.data.vehicle_rows || []).forEach(row => rowsAll.push(row)));
+      if(rowsAll.length){
+        const agg = {};
+        rowsAll.forEach(row => {
+          const k = row.vid || row.name;
+          if(!agg[k]) agg[k] = {...row, trips:0, ton:0, liter:0};
+          agg[k].trips = n(agg[k].trips) + n(row.trips);
+          agg[k].ton = n(agg[k].ton) + n(row.ton);
+          agg[k].liter = n(agg[k].liter) + n(row.liter);
+        });
+        data.vehicle_rows = Object.values(agg);
+      }
+      // Асуудлын текстүүдийг нэгтгэнэ (сүүлийн 5)
+      const issues = list.filter(r => (r.data||{}).issue_text).map(r => r.data.issue_text);
+      if(issues.length) data.issue_text = issues.slice(-5).join(' · ');
+      const lastRep = list[list.length - 1] || {};
+      if(key === 'issue'){
+        data.status = (lastRep.data||{}).status || '';
+        data.severity = (lastRep.data||{}).severity || '';
+      }
+      out[key] = {data, submitted_by_name: lastRep.submitted_by_name, updated_at: lastRep.updated_at,
+                  _count: list.length, _days: new Set(list.map(r => r.date)).size};
+    });
+    return out;
+  }
+  return {byType};
+})();
+
+/* ================================================================
+   ХУГАЦААНЫ ТАЙЛАН — сонгосон интервалын нэгтгэл, даалгавар, асуудал.
+   Хяналтын самбар болон бусад хуудсаас дуудагдана.
+   RangeReport.render(box, from, to) → Promise
+   ================================================================ */
+const RangeReport = (() => {
+  const addDays = (iso, n) => { const d = new Date(iso + 'T00:00:00'); d.setDate(d.getDate() + n); return d.toISOString().slice(0,10); };
+  const daysBetween = (a, b) => Math.round((new Date(b + 'T00:00:00') - new Date(a + 'T00:00:00')) / 86400000);
+  let rangeFilter = {status:null, person:null};
+
+  function aggregate(reports){
+    const n = CONFIG.num;
+    const a = {prod:0, sludge:0, waste:0, product:0, shortT:0, weigh:0,
+               fuelIn:0, fuelOut:0, hseV:0, hseM:0, issues:[], days:new Set(), count:0};
+    (reports || []).forEach(r => {
+      const d = r.data || {};
+      a.days.add(r.date); a.count++;
+      if(r.report_type === 'production') a.prod += n(d.shift_day_product_ton) + n(d.shift_night_product_ton);
+      if(r.report_type === 'transport'){
+        a.sludge += n(d.sludge_ton); a.waste += n(d.waste_ton);
+        a.product += n(d.product_transport_ton); a.shortT += n(d.short_waste_ton);
+        a.weigh += n(d.weighbridge_net_ton);
+      }
+      if(r.report_type === 'fuel'){
+        a.fuelIn += n(d.fuel_income_liter != null ? d.fuel_income_liter : d.fuel_truck_income_liter);
+        a.fuelOut += d.fuel_expense_liter != null ? n(d.fuel_expense_liter)
+          : n(d.fuel_truck_machine_liter) + n(d.fuel_truck_plant_liter) + n(d.reserve_tank_expense_liter);
+      }
+      if(r.report_type === 'hse'){ a.hseV += n(d.hse_violation_count); a.hseM += n(d.medical_assistance_count); }
+      if(d.issue_text) a.issues.push({date:r.date, text:d.issue_text, type:r.report_type, sev:d.issue_severity || d.severity || ''});
+    });
+    return a;
+  }
+
+  function trendChip(cur, prev, lowerBetter){
+    if(!prev || prev === 0) return '';
+    const pct = Math.round(((cur - prev) / prev) * 100);
+    if(pct === 0) return `<span class="trend-chip trend-flat">— 0%<small>өмнөхөөс</small></span>`;
+    const up = pct > 0, good = lowerBetter ? !up : up;
+    return `<span class="trend-chip ${good ? 'trend-good' : 'trend-bad'}">${up ? '▲' : '▼'} ${Math.abs(pct)}%<small>өмнөхөөс</small></span>`;
+  }
+
+  async function render(box, from, to){
+    if(!box) return;
+    if(!from || !to){ box.innerHTML = '<div class="module-empty">Хугацаа сонгоно уу.</div>'; return; }
+    if(from > to){ box.innerHTML = '<div class="module-empty">Эхлэх огноо дуусах огнооноос хойш байна.</div>'; return; }
+    box.innerHTML = '<div class="module-empty">Ачаалж байна…</div>';
+    try{
+      const span = daysBetween(from, to) + 1;
+      const pFrom = addDays(from, -span), pTo = addDays(from, -1);
+      const [cur, prev] = await Promise.all([API.range(from, to), API.range(pFrom, pTo)]);
+      const a = aggregate(cur.reports), p = aggregate(prev.reports);
+
+      const modules = CONFIG.reportTypes.length;
+      const expected = span * modules;
+      const attend = expected ? Math.round(a.count / expected * 100) : 0;
+
+      const card = (label, val, unit, cur2, prev2, lower) => `<div class="rs-card">
+        <div class="rs-label">${UI.esc(label)}</div>
+        <div class="rs-val"><b>${val}</b>${unit ? `<span>${unit}</span>` : ''}</div>
+        ${trendChip(cur2, prev2, lower)}
+      </div>`;
+
+      const ISSUE_LIMIT = 12;
+      const issueRow = i => {
+        const t = CONFIG.reportTypes.find(x => x.key === i.type);
+        const sevTone = i.sev === 'high' ? 'st-post' : (i.sev === 'medium' ? 'st-open' : '');
+        return `<div class="rs-issue">
+          <span class="rs-issue-dot" style="background:${t ? t.color : 'var(--ink-3)'}"></span>
+          <span class="rs-issue-day">${i.date.slice(5).replace('-', '/')}</span>
+          <span class="rs-issue-dep">${t ? UI.esc(t.name) : ''}</span>
+          <span class="rs-issue-txt">${UI.esc(i.text)}</span>
+          ${i.sev ? `<span class="task-status ${sevTone}">${i.sev === 'high' ? 'Өндөр' : (i.sev === 'medium' ? 'Дунд' : 'Бага')}</span>` : ''}
+        </div>`;
+      };
+      const issueRows = a.issues.length
+        ? a.issues.slice(0, ISSUE_LIMIT).map(issueRow).join('')
+          + (a.issues.length > ISSUE_LIMIT
+              ? `<div class="rs-more"><button type="button" class="btn btn-soft btn-sm" id="moreIssuesBtn">Бүгдийг харах (${a.issues.length})</button></div>`
+              : '')
+        : '<div class="module-empty">Энэ хугацаанд бүртгэгдсэн асуудал алга.</div>';
+
+      // Тухайн хугацаанд ӨГСӨН даалгаврууд — хурлын огноогоор шүүгдсэн
+      const tasks = cur.tasks || [];
+      const today = UI.today();
+      const tDone = tasks.filter(t => t.status === 'done').length;
+      const tPost = tasks.filter(t => t.status === 'postponed').length;
+      const tOpen = tasks.filter(t => t.status === 'open').length;
+      const tLate = tasks.filter(t => t.status !== 'done' && t.due_date && t.due_date < today).length;
+
+      // Хариуцагчаар задаргаа
+      const byPerson = {};
+      tasks.forEach(t => {
+        const k = t.assignee_name || 'Хариуцагчгүй';
+        if(!byPerson[k]) byPerson[k] = {done:0, total:0};
+        byPerson[k].total++;
+        if(t.status === 'done') byPerson[k].done++;
+      });
+      const personChips = Object.keys(byPerson).sort().map(k => {
+        const v = byPerson[k];
+        const full = v.done === v.total;
+        return `<button type="button" class="pr-chip ${full ? 'pr-full' : ''}" data-person="${UI.esc(k)}">${UI.esc(k)} <b>${v.done}/${v.total}</b></button>`;
+      }).join('');
+
+      // Даалгаврын жагсаалтыг шүүлтүүртэйгээр зурна (chip дарахад дуудагдана)
+      const isLate = t => t.status !== 'done' && t.due_date && t.due_date < today;
+      function drawTaskList(){
+        const sel = rangeFilter;
+        const list = tasks.filter(t => {
+          if(sel.status === 'late' ? !isLate(t) : (sel.status && t.status !== sel.status)) return false;
+          if(sel.person && (t.assignee_name || 'Хариуцагчгүй') !== sel.person) return false;
+          return true;
+        });
+        const box2 = UI.$('#rangeTaskList');
+        if(!box2) return;
+        if(!list.length){ box2.innerHTML = '<div class="module-empty">Энэ шүүлтүүрт тохирох даалгавар алга.</div>'; return; }
+        const groups = {};
+        list.forEach(t => { (groups[t.meeting_date] = groups[t.meeting_date] || []).push(t); });
+        box2.innerHTML = Object.keys(groups).sort().reverse().map(md => {
+          const rows = groups[md].map(t => `<div class="task-view">
+            <span class="task-status ${TASK_STATUS_TONE[t.status] || ''}">${TASK_STATUS_LABELS[t.status] || t.status}</span>
+            <div class="task-body">
+              <div class="task-txt">${UI.esc(t.task_text)}</div>
+              <div class="task-meta-row">
+                <span class="task-who">${t.assignee_name ? UI.esc(t.assignee_name) : 'Хариуцагчгүй'}</span>
+                <span class="tdates">${dateChips(t, md)}</span>
+              </div>
+              ${t.worker_note ? `<div class="task-note">${UI.esc(t.worker_note)}</div>` : ''}
+            </div>
+          </div>`).join('');
+          return `<div class="tg"><div class="tg-head">${md} хурал <span>${groups[md].length}</span></div>${rows}</div>`;
+        }).join('');
+      }
+
+      const taskBlock = tasks.length ? `
+        <div class="rs-issues-head">Энэ хугацаанд өгсөн даалгавар <span>${tasks.length}</span></div>
+        <div class="tsum">
+          <button type="button" class="tsum-chip st-done" data-status="done">Биелсэн ${tDone}</button>
+          <button type="button" class="tsum-chip st-open" data-status="open">Хийгдэж байна ${tOpen}</button>
+          <button type="button" class="tsum-chip st-post" data-status="postponed">Хойшилсон ${tPost}</button>
+          ${tLate ? `<button type="button" class="tsum-chip st-late" data-status="late">⚠ Хугацаа хэтэрсэн ${tLate}</button>` : ''}
+          <button type="button" class="btn btn-soft btn-sm" id="toggleTasksBtn">Дэлгэрэнгүй</button>
+        </div>
+        <div class="pr-chips">${personChips}</div>
+        <div id="rangeTaskList" class="hidden"></div>` : '';
+
+      box.innerHTML = `
+        <div class="rs-head">${span} хоног · ${a.days.size} өдөр тайлан ирсэн · ирц ${attend}%</div>
+        <div class="rs-grid">
+          ${card('Бүтээгдэхүүн үйлдвэрлэлт', UI.fmt(a.prod), 'тн', a.prod, p.prod)}
+          ${card('Шлам (ER-ээс)', UI.fmt(a.sludge), 'тн', a.sludge, p.sludge)}
+          ${card('Хаягдал', UI.fmt(a.waste), 'тн', a.waste, p.waste)}
+          ${card('Бүтээгдэхүүн тээвэр', UI.fmt(a.product + a.shortT), 'тн', a.product + a.shortT, p.product + p.shortT)}
+          ${card('Пүүний жин', UI.fmt(a.weigh), 'тн', a.weigh, p.weigh)}
+          ${card('Түлш зарлага', UI.fmt(a.fuelOut), 'л', a.fuelOut, p.fuelOut, true)}
+          ${card('ХАБ зөрчил', UI.fmt(a.hseV), '', a.hseV, p.hseV, true)}
+        </div>
+        ${taskBlock}
+        <div class="rs-issues-wrap">
+          <button type="button" class="sec-toggle" id="issuesToggle">
+            <span>Тухайн хугацааны асуудлууд <span class="sec-count">${a.issues.length}</span></span>
+            <span class="sec-caret">▾</span>
+          </button>
+          <div class="rs-issues" id="rsIssues">${issueRows}</div>
+        </div>`;
+
+      // ---- Шүүлтүүрийн удирдлага ----
+      const listEl = UI.$('#rangeTaskList');
+      const tBtn = UI.$('#toggleTasksBtn');
+      function openList(){ if(listEl){ listEl.classList.remove('hidden'); if(tBtn) tBtn.textContent = 'Хураах'; } }
+      function syncChips(){
+        UI.$$('.tsum-chip').forEach(c => c.classList.toggle('chip-on', c.dataset.status === rangeFilter.status));
+        UI.$$('.pr-chip').forEach(c => c.classList.toggle('chip-on', c.dataset.person === rangeFilter.person));
+      }
+      if(tasks.length){
+        rangeFilter = {status:null, person:null};
+        drawTaskList();
+        UI.$$('.tsum-chip').forEach(chip => chip.onclick = () => {
+          rangeFilter.status = (rangeFilter.status === chip.dataset.status) ? null : chip.dataset.status;
+          syncChips(); drawTaskList(); openList();
+        });
+        UI.$$('.pr-chip').forEach(chip => chip.onclick = () => {
+          rangeFilter.person = (rangeFilter.person === chip.dataset.person) ? null : chip.dataset.person;
+          syncChips(); drawTaskList(); openList();
+        });
+      }
+      if(tBtn) tBtn.onclick = () => {
+        const hidden = listEl.classList.toggle('hidden');
+        tBtn.textContent = hidden ? 'Дэлгэрэнгүй' : 'Хураах';
+      };
+      const iBtn = UI.$('#moreIssuesBtn');
+      if(iBtn) iBtn.onclick = () => {
+        UI.$('#rsIssues').innerHTML = a.issues.map(issueRow).join('');
+      };
+      // Асуудлын хэсгийг хураах / дэлгэх
+      const isToggle = UI.$('#issuesToggle');
+      if(isToggle) isToggle.onclick = () => {
+        const hid = UI.$('#rsIssues').classList.toggle('hidden');
+        isToggle.classList.toggle('sec-closed', hid);
+      };
+    }catch(err){
+      box.innerHTML = `<div class="module-empty">${UI.esc(err.message)}</div>`;
+    }
+  }
+
+  return {render, addDays, daysBetween};
+})();
+
+/* ================================================================
    PAGE: DASHBOARD (dashboard.html) — Захирал болон ажилтан хоёулаа
    энэ хуудсыг харах эрхтэй.
    ================================================================ */
@@ -664,62 +1124,222 @@ const PageDashboard = () => {
   let dailyPrevMap = {}; // өмнөх өдрийн тайлан — өсөлт/бууралтын хувь бодоход
   let dashPlan = {}; // тухайн сарын төлөвлөгөө (gauge-д хэрэгтэй)
   let dashDate = UI.today();
+  let dashSpan = 1;      // сонгосон хугацааны хоногийн тоо (gauge-ийн зорилтод)
+  let periodDays = 0;    // тайлан ирсэн өдрийн тоо
 
   const dateInput = UI.$('#dashboardDate');
-  const monthInput = UI.$('#dashboardMonth');
+  const monthInput = UI.$('#dashboardMonth');   // ТҮР ХАССАН хэсэгт хамаарна (байхгүй бол алгасна)
   dateInput.value = UI.today();
-  monthInput.value = UI.thisMonth();
+  if(monthInput){ monthInput.value = UI.thisMonth(); monthInput.onchange = () => loadMonthly(monthInput.value); }
   dateInput.onchange = () => loadDaily(dateInput.value);
-  monthInput.onchange = () => loadMonthly(monthInput.value);
   UI.$('#prevDayBtn').onclick = () => shiftDay(-1);
   UI.$('#nextDayBtn').onclick = () => shiftDay(1);
+
+  /* ---------------- Хугацааны удирдлага ----------------
+     Hero-гийн огноо = тулгуур өдөр, preset = цонхны урт.
+     «Өдөр» бол ганц өдөр — өмнөх бүх зан төлөв хэвээр. */
+  let periodKind = 'day';
+  let periodFrom = UI.today(), periodTo = UI.today();
+  const PERIOD_LABELS = {day:'Өдөр', week:'7 хоног', month:'Сар', q:'3 сар'};
+
+  function computePeriod(kind, anchor){
+    const d = new Date(anchor + 'T00:00:00');
+    if(kind === 'week') return [RangeReport.addDays(anchor, -6), anchor];
+    if(kind === 'month') return [`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`, anchor];
+    if(kind === 'q'){ const q = new Date(d); q.setMonth(q.getMonth() - 3); q.setDate(q.getDate() + 1);
+                      return [q.toISOString().slice(0,10), anchor]; }
+    return [anchor, anchor];
+  }
+  function setPeriod(kind){
+    periodKind = kind;
+    [periodFrom, periodTo] = computePeriod(kind, dateInput.value || UI.today());
+    UI.$$('.preset-btn').forEach(b => b.classList.toggle('preset-on', b.dataset.preset === kind));
+    const info = UI.$('#heroRangeInfo');
+    if(info) info.textContent = (kind === 'day') ? '' : `${periodFrom} — ${periodTo}`;
+    loadPeriod();
+  }
+  UI.$$('.preset-btn').forEach(b => b.onclick = () => setPeriod(b.dataset.preset));
 
   function shiftDay(delta){
     const d = new Date(dateInput.value || UI.today());
     d.setDate(d.getDate() + delta);
     dateInput.value = d.toISOString().slice(0,10);
-    loadDaily(dateInput.value);
+    setPeriod(periodKind);
   }
 
-  async function loadDaily(date){
+  /** Сонгосон хугацааны тайланг татаж, нэг өдрийн хэлбэрт хувиргаад зурна */
+  async function loadPeriod(){
     const msg = UI.$('#dashboardMessage');
     UI.alertBox(msg, '');
-    // Hero-д тухайн өдрийн он/сар/өдрийг Монголоор бичнэ
-    // Тухайн өдрийн он сар өдөр гарчигт томоор, доор нь энгийн тайлбар
+    const single = (periodFrom === periodTo);
+    const spanDays = RangeReport.daysBetween(periodFrom, periodTo) + 1;
+
     const heroDate = UI.$('#heroDate');
-    if(heroDate) heroDate.textContent = UI.formatDateMn(date);
+    if(heroDate) heroDate.textContent = single
+      ? UI.formatDateMn(periodTo)
+      : `${UI.formatDateMn(periodFrom).replace(' гараг','')} — ${UI.formatDateMn(periodTo).replace(' гараг','')}`;
     const heroLine = UI.$('#heroDateLine');
-    if(heroLine) heroLine.textContent = 'Тайлангийн нэгтгэл';
+    if(heroLine) heroLine.textContent = single ? 'Тайлангийн нэгтгэл'
+      : `${PERIOD_LABELS[periodKind] || ''} · ${spanDays} хоногийн нэгтгэл`;
+
     UI.$('#statusRow').innerHTML = '';
     UI.$('#summaryCards').innerHTML = '<div class="module-empty">Ачаалж байна…</div>';
     UI.$('#moduleDetail').innerHTML = '';
     try{
-      const prevD = new Date(date + 'T00:00:00');
-      prevD.setDate(prevD.getDate() - 1);
-      const prevIso = prevD.toISOString().slice(0,10);
-      const [res, prevRes, planRes] = await Promise.all([
-        API.daily(date),
-        API.daily(prevIso).catch(() => ({reports: []})),
-        API.plan(date.slice(0,7)).catch(() => ({plan: {}}))
+      // Өмнөх ижил урттай хугацаа — харьцуулалтад
+      const pTo = RangeReport.addDays(periodFrom, -1);
+      const pFrom = RangeReport.addDays(periodFrom, -spanDays);
+      const [cur, prev, planRes] = await Promise.all([
+        API.range(periodFrom, periodTo),
+        API.range(pFrom, pTo).catch(() => ({reports: []})),
+        API.plan(periodTo.slice(0,7)).catch(() => ({plan: {}}))
       ]);
       dashPlan = planRes.plan || {};
-      dashDate = date;
-      dailyMap = {};
-      (res.reports || []).forEach(r => { dailyMap[r.report_type] = r; });
-      dailyPrevMap = {};
-      (prevRes.reports || []).forEach(r => { dailyPrevMap[r.report_type] = r; });
+      dashDate = periodTo;
+      dashSpan = spanDays;
+      dailyMap = Aggregate.byType(cur.reports);
+      dailyPrevMap = Aggregate.byType(prev.reports);
+      periodDays = new Set((cur.reports||[]).map(r => r.date)).size;
       renderStatusRow();
-      renderSummaryCards();
+      KpiCards.render(UI.$('#summaryCards'), dailyMap, dailyPrevMap,
+                      {plan: dashPlan, date: dashDate, span: dashSpan});
+      renderPeriodExtras(cur);
     }catch(err){
       if(/нэвтрэлт|эрхгүй/i.test(err.message)){ SESSION.clear(); location.href = 'index.html'; return; }
       UI.$('#summaryCards').innerHTML = '';
       UI.alertBox(msg, err.message);
     }
   }
+  const loadDaily = () => setPeriod(periodKind);   // хуучин дуудлагатай нийцүүлэх
+
+  /** Хугацааны нэмэлт хэсгүүд: хурлын даалгавар ба асуудлын жагсаалт.
+      Хоёулаа тусдаа панелд, өгөгдөлгүй бол нуугдана. */
+  let taskFilter = {status:null, person:null};
+  function renderPeriodExtras(cur){
+    const tasks = cur.tasks || [];
+    const today = UI.today();
+    const isLate = t => t.status !== 'done' && t.due_date && t.due_date < today;
+
+    /* ---- Даалгавар ---- */
+    const tPanel = UI.$('#tasksPanel'), tBox = UI.$('#periodTasks');
+    if(tPanel && tBox){
+      if(!tasks.length){ tPanel.classList.add('hidden'); }
+      else {
+        tPanel.classList.remove('hidden');
+        const done = tasks.filter(t => t.status === 'done').length;
+        const open = tasks.filter(t => t.status === 'open').length;
+        const post = tasks.filter(t => t.status === 'postponed').length;
+        const late = tasks.filter(isLate).length;
+        const sub = UI.$('#tasksSub');
+        if(sub) sub.textContent = `${periodFrom} — ${periodTo} · нийт ${tasks.length} даалгавар`;
+
+        const byPerson = {};
+        tasks.forEach(t => {
+          const k = t.assignee_name || 'Хариуцагчгүй';
+          if(!byPerson[k]) byPerson[k] = {done:0, total:0};
+          byPerson[k].total++; if(t.status === 'done') byPerson[k].done++;
+        });
+        const personChips = Object.keys(byPerson).sort().map(k => {
+          const v = byPerson[k];
+          return `<button type="button" class="pr-chip ${v.done === v.total ? 'pr-full' : ''}" data-person="${UI.esc(k)}">${UI.esc(k)} <b>${v.done}/${v.total}</b></button>`;
+        }).join('');
+
+        taskFilter = {status:null, person:null};
+        tBox.innerHTML = `
+          <div class="tsum">
+            <button type="button" class="tsum-chip st-done" data-status="done">Биелсэн ${done}</button>
+            <button type="button" class="tsum-chip st-open" data-status="open">Хийгдэж байна ${open}</button>
+            <button type="button" class="tsum-chip st-post" data-status="postponed">Хойшилсон ${post}</button>
+            ${late ? `<button type="button" class="tsum-chip st-late" data-status="late">⚠ Хугацаа хэтэрсэн ${late}</button>` : ''}
+          </div>
+          <div class="pr-chips">${personChips}</div>
+          <div id="periodTaskList"></div>`;
+
+        const drawTasks = () => {
+          const list = tasks.filter(t => {
+            if(taskFilter.status === 'late' ? !isLate(t) : (taskFilter.status && t.status !== taskFilter.status)) return false;
+            if(taskFilter.person && (t.assignee_name || 'Хариуцагчгүй') !== taskFilter.person) return false;
+            return true;
+          });
+          const el = UI.$('#periodTaskList');
+          if(!list.length){ el.innerHTML = '<div class="module-empty">Энэ шүүлтүүрт тохирох даалгавар алга.</div>'; return; }
+          const groups = {};
+          list.forEach(t => { (groups[t.meeting_date] = groups[t.meeting_date] || []).push(t); });
+          el.innerHTML = Object.keys(groups).sort().reverse().map(md => {
+            const rows = groups[md].map(t => `<div class="task-view">
+              <span class="task-status ${TASK_STATUS_TONE[t.status] || ''}">${TASK_STATUS_LABELS[t.status] || t.status}</span>
+              <div class="task-body">
+                <div class="task-txt">${UI.esc(t.task_text)}</div>
+                <div class="task-meta-row">
+                  <span class="task-who">${t.assignee_name ? UI.esc(t.assignee_name) : 'Хариуцагчгүй'}</span>
+                  <span class="tdates">${dateChips(t, md)}</span>
+                </div>
+                ${t.worker_note ? `<div class="task-note">${UI.esc(t.worker_note)}</div>` : ''}
+              </div>
+            </div>`).join('');
+            return `<div class="tg"><div class="tg-head">${md} хурал <span>${groups[md].length}</span></div>${rows}</div>`;
+          }).join('');
+        };
+        const sync = () => {
+          UI.$$('.tsum-chip', tBox).forEach(c => c.classList.toggle('chip-on', c.dataset.status === taskFilter.status));
+          UI.$$('.pr-chip', tBox).forEach(c => c.classList.toggle('chip-on', c.dataset.person === taskFilter.person));
+        };
+        UI.$$('.tsum-chip', tBox).forEach(c => c.onclick = () => {
+          taskFilter.status = (taskFilter.status === c.dataset.status) ? null : c.dataset.status;
+          sync(); drawTasks();
+        });
+        UI.$$('.pr-chip', tBox).forEach(c => c.onclick = () => {
+          taskFilter.person = (taskFilter.person === c.dataset.person) ? null : c.dataset.person;
+          sync(); drawTasks();
+        });
+        drawTasks();
+      }
+    }
+
+    /* ---- Асуудлууд ---- */
+    const iPanel = UI.$('#issuesPanel'), iBox = UI.$('#periodIssues');
+    if(iPanel && iBox){
+      const issues = [];
+      (cur.reports || []).forEach(r => {
+        const d = r.data || {};
+        if(d.issue_text) issues.push({date:r.date, text:d.issue_text, type:r.report_type,
+                                      sev:d.issue_severity || d.severity || ''});
+      });
+      issues.sort((a,b) => b.date.localeCompare(a.date));
+      if(!issues.length){ iPanel.classList.add('hidden'); return; }
+      iPanel.classList.remove('hidden');
+      const sub = UI.$('#issuesSub');
+      if(sub) sub.textContent = `${periodFrom} — ${periodTo} · нийт ${issues.length}`;
+      const row = i => {
+        const t = CONFIG.reportTypes.find(x => x.key === i.type);
+        const tone = i.sev === 'high' ? 'st-post' : (i.sev === 'medium' ? 'st-open' : '');
+        return `<div class="rs-issue">
+          <span class="rs-issue-dot" style="background:${t ? t.color : 'var(--ink-3)'}"></span>
+          <span class="rs-issue-day">${i.date.slice(5).replace('-','/')}</span>
+          <span class="rs-issue-dep">${t ? UI.esc(t.name) : ''}</span>
+          <span class="rs-issue-txt">${UI.esc(i.text)}</span>
+          ${i.sev ? `<span class="task-status ${tone}">${i.sev === 'high' ? 'Өндөр' : (i.sev === 'medium' ? 'Дунд' : 'Бага')}</span>` : ''}
+        </div>`;
+      };
+      const LIM = 10;
+      iBox.innerHTML = `<div class="rs-issues" id="dashIssues">${issues.slice(0, LIM).map(row).join('')}</div>`
+        + (issues.length > LIM ? `<div class="rs-more"><button type="button" class="btn btn-soft btn-sm" id="dashMoreIssues">Бүгдийг харах (${issues.length})</button></div>` : '');
+      const mb = UI.$('#dashMoreIssues');
+      if(mb) mb.onclick = () => { UI.$('#dashIssues').innerHTML = issues.map(row).join(''); mb.remove(); };
+    }
+  }
 
   function renderStatusRow(){
     const submitted = CONFIG.reportTypes.filter(t => dailyMap[t.key]).length;
     const total = CONFIG.reportTypes.length;
+    // Олон өдрийн хугацаанд ирцийг «ирсэн тайлан / байх ёстой тайлан»-аар үзүүлнэ
+    const multi = dashSpan > 1;
+    const gotAll = CONFIG.reportTypes.reduce((a,t) => a + ((dailyMap[t.key] || {})._count || 0), 0);
+    const expAll = dashSpan * total;
+    const sub = UI.$('#statusSub');
+    if(sub) sub.textContent = multi
+      ? `${dashSpan} хоногт ${gotAll}/${expAll} тайлан · ${periodDays} өдөр бүртгэгдсэн`
+      : '';
 
     // Ирцийн дугуй заалт (progress ring)
     const ringBox = UI.$('#attendanceRing');
@@ -771,133 +1391,6 @@ const PageDashboard = () => {
      Хэлтэс бүрийн тайлангийн issue_text-ийг цуглуулж, ноцтой байдлаар нь
      эрэмбэлэн, хэлтсийн өнгө/icon-оор ялгаж нэг картад харуулна. */
   const SEV_LABEL = {low:'Бага', medium:'Дунд', high:'Өндөр'};
-  const SEV_RANK  = {high:0, medium:1, low:2};
-
-  function collectIssues(){
-    const out = [];
-    CONFIG.reportTypes.forEach(t => {
-      const r = dailyMap[t.key];
-      if(!r || !r.data) return;
-      const text = String(r.data.issue_text || '').trim();
-      if(!text) return;
-      const isIssueModule = t.key === 'issue';
-      out.push({
-        key: t.key,
-        name: isIssueModule ? 'Ерөнхий асуудал' : t.name,
-        color: t.color,
-        icon: t.icon,
-        text: text,
-        sev: r.data.issue_severity || r.data.severity || '',
-        status: isIssueModule ? (r.data.status || '') : '',
-        action: isIssueModule ? String(r.data.action_taken || '').trim() : '',
-        person: isIssueModule ? String(r.data.responsible_person || '').trim() : ''
-      });
-    });
-    return out.sort((a, b) => {
-      const ra = SEV_RANK[a.sev] === undefined ? 3 : SEV_RANK[a.sev];
-      const rb = SEV_RANK[b.sev] === undefined ? 3 : SEV_RANK[b.sev];
-      return ra - rb;
-    });
-  }
-
-  function issuesCard(){
-    const type = CONFIG.reportTypes.find(t => t.key === 'issue') || {};
-    const chip = `<span class="mchip" style="background:${type.color}">${type.icon || ''}</span>`;
-    const items = collectIssues();
-    const arrived = CONFIG.reportTypes.filter(t => dailyMap[t.key]).length;
-
-    if(!items.length){
-      return `<div class="bezel card card-full card-issues"><span class="tick-a"></span><span class="tick-b"></span>
-        <div class="card-tag-row"><span class="label">${chip}Асуудал</span>
-          <span class="issue-tally ok">Асуудалгүй</span></div>
-        <div class="issue-none">Ирсэн ${arrived} тайлангийн аль нь ч асуудал тэмдэглээгүй байна.</div>
-      </div>`;
-    }
-
-    const high = items.filter(i => i.sev === 'high').length;
-    const rows = items.map(i => {
-      const sevTag = i.sev
-        ? `<span class="issue-sev sev-${UI.esc(i.sev)}">${UI.esc(SEV_LABEL[i.sev] || i.sev)}</span>` : '';
-      const stTag = i.status
-        ? `<span class="issue-st ${i.status === 'open' ? 'st-open' : 'st-done'}">${i.status === 'open' ? 'Нээлттэй' : 'Шийдсэн'}</span>` : '';
-      const meta = [];
-      if(i.action) meta.push('Авсан арга хэмжээ: ' + i.action);
-      if(i.person) meta.push('Хариуцсан: ' + i.person);
-      return `<div class="issue-item" style="--iss:${i.color}">
-        <div class="issue-top">
-          <span class="issue-dept"><span class="mchip mchip-sm" style="background:${i.color}">${i.icon || ''}</span>${UI.esc(i.name)}</span>
-          <span class="issue-tags">${sevTag}${stTag}</span>
-        </div>
-        <div class="issue-text">${UI.esc(i.text)}</div>
-        ${meta.length ? `<div class="issue-meta">${UI.esc(meta.join(' · '))}</div>` : ''}
-      </div>`;
-    }).join('');
-
-    return `<div class="bezel card card-full card-issues${high ? ' card-warn' : ''}"><span class="tick-a"></span><span class="tick-b"></span>
-      <div class="card-tag-row"><span class="label">${chip}Асуудал</span>
-        <span class="issue-tally${high ? ' bad' : ''}">${items.length} асуудал${high ? ' · ' + high + ' өндөр' : ''}</span></div>
-      <div class="issue-list">${rows}</div>
-    </div>`;
-  }
-
-  function renderSummaryCards(){
-    UI.$('#summaryCards').innerHTML = CONFIG.summaryCards.map(c => {
-      const r = dailyMap[c.key];
-      const type = CONFIG.reportTypes.find(t => t.key === c.key) || {};
-      const chip = `<span class="mchip" style="background:${type.color}">${type.icon || ''}</span>`;
-      const featured = c.featured ? 'card-featured' : '';
-      const fullRow = c.fullRow ? 'card-full' : '';
-
-      if(!r){
-        return `<div class="bezel card card-missing ${featured} ${fullRow}"><span class="tick-a"></span><span class="tick-b"></span>
-          <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span></div>
-          <div class="value">—</div><div class="sub">Тайлан ороогүй</div></div>`;
-      }
-
-      const val = c.calc(r.data);
-      const warn = c.warnIf ? c.warnIf(r.data) : false;
-
-      // Өмнөх өдрөөс өссөн/буурсан хувь (▲/▼ chip). Бага нь сайн үзүүлэлтэд өнгө урвуулна.
-      let trendChip = '';
-      const prev = dailyPrevMap[c.key];
-      if(prev){
-        const prevVal = c.calc(prev.data);
-        if(prevVal > 0){
-          const pct = Math.round(((val - prevVal) / prevVal) * 100);
-          if(pct !== 0){
-            const up = pct > 0;
-            const good = c.lowerBetter ? !up : up;
-            trendChip = `<span class="trend-chip ${good ? 'trend-good' : 'trend-bad'}">${up ? '▲' : '▼'} ${Math.abs(pct)}%<small>өчигдрөөс</small></span>`;
-          } else {
-            trendChip = `<span class="trend-chip trend-flat">— 0%<small>өчигдрөөс</small></span>`;
-          }
-        }
-      }
-
-      // Карт доторх визуал: viz hook (gauge/donut) байвал түүнийг,
-      // үгүй бол картын төрөлд тохирсон мини визуал (segments/hbars/chips/pill)
-      let miniHtml = '';
-      if(c.viz){
-        miniHtml = c.viz(r.data, {plan: dashPlan, date: dashDate}) || '';
-      } else if(c.mini){
-        miniHtml = UI.miniViz(c.mini(r.data), c.miniStyle);
-      }
-
-      const isViz = c.vizReplacesValue && miniHtml;
-      // Trend chip: энгийн картад том тооны хажууд, viz картад гарчгийн мөрөнд
-      const valueRow = isViz
-        ? ''
-        : `<div class="value-row"><div class="value"><span class="count" data-count="${val}">${UI.fmt(val)}</span>${c.unit ? ' <span class="unit">'+c.unit+'</span>' : ''}</div>${trendChip}</div>`;
-      const wide = (c.viz && miniHtml) ? 'card-wide' : '';
-      const subTxt = c.sub(r.data);
-      return `<div class="bezel card ${warn?'card-warn':''} ${featured} ${wide} ${fullRow}"><span class="tick-a"></span><span class="tick-b"></span>
-        <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span>${isViz ? trendChip : ''}</div>
-        ${valueRow}
-        ${miniHtml}
-        ${subTxt ? `<div class="sub">${UI.esc(subTxt)}</div>` : ''}</div>`;
-    }).join('') + issuesCard();
-    UI.animateCounts(UI.$('#summaryCards'));
-  }
 
   function renderModuleDetail(key){
     const r = dailyMap[key];
@@ -1353,8 +1846,9 @@ const PageDashboard = () => {
     </section>`;
   }
 
-  loadDaily(UI.today());
-  loadMonthly(UI.thisMonth());
+  setPeriod('day');   // эхэлж өдрийн харагдац
+  // Сарын хэсгүүд ТҮР ХАСАГДСАН — DOM-д байгаа тохиолдолд л ачаална
+  if(UI.$('#monthlyCards')) loadMonthly(UI.thisMonth());
 };
 
 /* ================================================================
@@ -1394,6 +1888,58 @@ const PageReport = () => {
   // Ганцхан эрхтэй бол сонголтын хэсгийг нуугаад шууд form руу
   if(allowed.length === 1){ UI.$('#reportPicker').classList.add('hidden'); }
   selectReport(allowed[0].key);
+
+  /* ---------------- Миний хийх ажил (хурлын даалгавар) ---------------- */
+  async function loadMyTasks(){
+    const panel = UI.$('#myTasksPanel');
+    const box = UI.$('#myTasksList');
+    if(!panel || !box) return;
+    try{
+      const res = await API.myTasks();
+      renderMyTasks(res.tasks || []);
+    }catch(e){ /* хурлын хүснэгт үүсээгүй бол чимээгүй өнгөрнө */ }
+  }
+
+  function renderMyTasks(tasks){
+    const panel = UI.$('#myTasksPanel');
+    const box = UI.$('#myTasksList');
+    const open = tasks.filter(t => t.status !== 'done');
+    if(!tasks.length){ panel.classList.add('hidden'); return; }
+    panel.classList.remove('hidden');
+    const today = UI.today();
+    box.innerHTML = tasks.map(t => {
+      const late = t.status !== 'done' && t.due_date && t.due_date < today;
+      const statusOpts = Object.keys(TASK_STATUS_LABELS).map(k =>
+        `<option value="${k}" ${t.status === k ? 'selected' : ''}>${TASK_STATUS_LABELS[k]}</option>`).join('');
+      return `<div class="mytask ${t.status === 'done' ? 'mytask-done' : ''}" data-id="${t.id}">
+        <div class="mytask-top">
+          <span class="task-status ${TASK_STATUS_TONE[t.status] || ''}">${TASK_STATUS_LABELS[t.status] || t.status}</span>
+          <span class="mytask-txt">${UI.esc(t.task_text)}</span>
+          ${t.due_date ? `<span class="mytask-due ${late ? 'mytask-late' : ''}">${late ? '⚠ ' : ''}${t.due_date}</span>` : ''}
+        </div>
+        <div class="mytask-ctl">
+          <select class="mt-status">${statusOpts}</select>
+          <input class="mt-note" type="text" maxlength="200" placeholder="Тайлбар (жишээ: сэлбэг ирээгүй)" value="${UI.esc(t.worker_note || '')}">
+          <button type="button" class="btn btn-soft btn-sm mt-save">Хадгалах</button>
+        </div>
+      </div>`;
+    }).join('') + `<div class="plan-foot" style="margin-top:10px">Нийт ${tasks.length} даалгавар · ${open.length} хийгдээгүй</div>`;
+
+    UI.$$('.mt-save', box).forEach(btn => btn.onclick = async () => {
+      const row = btn.closest('.mytask');
+      const id = row.dataset.id;
+      const status = row.querySelector('.mt-status').value;
+      const note = row.querySelector('.mt-note').value;
+      btn.disabled = true;
+      try{
+        const res = await API.taskStatus(id, status, note);
+        renderMyTasks(res.tasks || []);
+        UI.alertBox(UI.$('#myTasksMessage'), 'Даалгаврын төлөв шинэчлэгдлээ.', true);
+      }catch(err){ UI.alertBox(UI.$('#myTasksMessage'), err.message); }
+      finally{ btn.disabled = false; }
+    });
+  }
+  loadMyTasks();
 
   // Машины бүртгэлийг ачаална (тээвэр/түлш form-д хэрэгтэй). Ирсний дараа тухайн
   // form-ыг дахин зурж, машинуудыг гаргана. selectReport энэ үед аль хэдийн бэлэн.
@@ -1901,6 +2447,290 @@ const PageAdmin = () => {
 };
 
 /* ================================================================
+   PAGE: ХУРЛЫН ТЭМДЭГЛЭЛ (meeting.html)
+   Гүйцэтгэл (чөлөөт хугацаа) + өмнөх даалгавар + энэ хурлын
+   даалгавар + тэмдэглэл. Бүх нэвтэрсэн хүн үзнэ, админ засна.
+   ================================================================ */
+const TASK_STATUS_LABELS = {open:'Хийгдэж байна', done:'Биелсэн', postponed:'Хойшилсон'};
+const TASK_STATUS_TONE = {open:'st-open', done:'st-done', postponed:'st-post'};
+
+/** Даалгаврын огнооны хос: эхэлсэн (хурлын огноо) ба дуусах (эцсийн хугацаа).
+    Хугацаа хэтэрсэн, дуусаагүй бол улаанаар анхааруулна. */
+function dateChips(t, meetingDate){
+  const md = meetingDate || t.meeting_date || '';
+  const today = new Date().toISOString().slice(0, 10);
+  const late = t.status !== 'done' && t.due_date && t.due_date < today;
+  return (md ? `<span class="tdate">Эхэлсэн <b>${md}</b></span>` : '')
+    + (t.due_date
+        ? `<span class="tdate ${late ? 'tdate-late' : ''}">${late ? '⚠ ' : ''}Дуусах <b>${t.due_date}</b></span>`
+        : `<span class="tdate">Дуусах <b>—</b></span>`);
+}
+
+const PageMeeting = () => {
+  const dateInput = UI.$('#meetingDate');
+  if(!dateInput) return;                    // энэ хуудсанд хурлын хэсэг байхгүй
+  UI.paintUserChrome();
+  const session = SESSION.get();
+  if(!session){ location.href = 'index.html'; return; }
+  const isAdmin = session.role === 'admin';
+  const msg = UI.$('#meetingMessage');
+  let USERS = [];      // хариуцагчийн сонголт
+  let TASKS = [];      // энэ хурлын даалгавар (client талд засагдана)
+  let NOTES = '';
+
+  /** Хамгийн сүүлийн Даваа гараг (өнөөдөр Даваа бол өнөөдөр) */
+  function lastMonday(){
+    const d = new Date();
+    const shift = (d.getDay() + 6) % 7; // Дав=0 ... Ням=6
+    d.setDate(d.getDate() - shift);
+    return d.toISOString().slice(0, 10);
+  }
+
+  dateInput.value = lastMonday();
+
+  /* ---------------- Гүйцэтгэл: самбартай ижил KPI картууд ----------------
+     Хурлын огноо = төгсгөл, preset = буцах цонх. */
+  let mKind = 'week', mFrom = '', mTo = '';
+  function mCompute(){
+    const anchor = dateInput.value || UI.today();
+    mTo = RangeReport.addDays(anchor, -1);          // хурлын өмнөх өдөр хүртэл
+    const d = new Date(mTo + 'T00:00:00');
+    if(mKind === 'week') mFrom = RangeReport.addDays(mTo, -6);
+    else if(mKind === 'month') mFrom = `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;
+    else { const q = new Date(d); q.setMonth(q.getMonth() - 3); q.setDate(q.getDate() + 1); mFrom = q.toISOString().slice(0,10); }
+  }
+  async function loadKpi(){
+    const box = UI.$('#summaryCards');
+    if(!box) return;
+    mCompute();
+    const span = RangeReport.daysBetween(mFrom, mTo) + 1;
+    UI.$$('.preset-btn').forEach(b => b.classList.toggle('preset-on', b.dataset.preset === mKind));
+    const info = UI.$('#heroRangeInfo'); if(info) info.textContent = `${mFrom} — ${mTo}`;
+    const sub = UI.$('#kpiSub');
+    if(sub) sub.textContent = `${mFrom} — ${mTo} · ${span} хоног. Машин, хүн хүч = өдрийн дундаж.`;
+    box.innerHTML = '<div class="module-empty">Ачаалж байна…</div>';
+    try{
+      const pTo = RangeReport.addDays(mFrom, -1), pFrom = RangeReport.addDays(mFrom, -span);
+      const [cur, prev, planRes] = await Promise.all([
+        API.range(mFrom, mTo),
+        API.range(pFrom, pTo).catch(() => ({reports: []})),
+        API.plan(mTo.slice(0,7)).catch(() => ({plan: {}}))
+      ]);
+      KpiCards.render(box, Aggregate.byType(cur.reports), Aggregate.byType(prev.reports),
+                      {plan: planRes.plan || {}, date: mTo, span});
+      renderMeetingExtras(cur, span);
+    }catch(err){ box.innerHTML = `<div class="module-empty">${UI.esc(err.message)}</div>`; }
+  }
+  UI.$$('.preset-btn').forEach(b => b.onclick = () => { mKind = b.dataset.preset; loadKpi(); });
+
+  /** Асуудлын жагсаалт + хугацааны бүх даалгавар */
+  function renderMeetingExtras(cur, span){
+    const iPanel = UI.$('#issuesPanel'), iBox = UI.$('#periodIssues');
+    if(iPanel && iBox){
+      const issues = [];
+      (cur.reports || []).forEach(r => {
+        const d = r.data || {};
+        if(d.issue_text) issues.push({date:r.date, text:d.issue_text, type:r.report_type,
+                                      sev:d.issue_severity || d.severity || ''});
+      });
+      issues.sort((a,b) => b.date.localeCompare(a.date));
+      if(!issues.length) iPanel.classList.add('hidden');
+      else {
+        iPanel.classList.remove('hidden');
+        const s = UI.$('#issuesSub'); if(s) s.textContent = `${mFrom} — ${mTo} · нийт ${issues.length}`;
+        const row = i => {
+          const t = CONFIG.reportTypes.find(x => x.key === i.type);
+          const tone = i.sev === 'high' ? 'st-post' : (i.sev === 'medium' ? 'st-open' : '');
+          return `<div class="rs-issue">
+            <span class="rs-issue-dot" style="background:${t ? t.color : 'var(--ink-3)'}"></span>
+            <span class="rs-issue-day">${i.date.slice(5).replace('-','/')}</span>
+            <span class="rs-issue-dep">${t ? UI.esc(t.name) : ''}</span>
+            <span class="rs-issue-txt">${UI.esc(i.text)}</span>
+            ${i.sev ? `<span class="task-status ${tone}">${i.sev === 'high' ? 'Өндөр' : (i.sev === 'medium' ? 'Дунд' : 'Бага')}</span>` : ''}
+          </div>`;
+        };
+        const LIM = 10;
+        iBox.innerHTML = `<div class="rs-issues" id="mIssues">${issues.slice(0,LIM).map(row).join('')}</div>`
+          + (issues.length > LIM ? `<div class="rs-more"><button type="button" class="btn btn-soft btn-sm" id="mMoreIssues">Бүгдийг харах (${issues.length})</button></div>` : '');
+        const mb = UI.$('#mMoreIssues');
+        if(mb) mb.onclick = () => { UI.$('#mIssues').innerHTML = issues.map(row).join(''); mb.remove(); };
+      }
+    }
+
+    const tPanel = UI.$('#tasksPanel'), tBox = UI.$('#periodTasks');
+    if(tPanel && tBox){
+      const tasks = cur.tasks || [];
+      if(!tasks.length){ tPanel.classList.add('hidden'); return; }
+      tPanel.classList.remove('hidden');
+      const s = UI.$('#tasksSub'); if(s) s.textContent = `${mFrom} — ${mTo} · нийт ${tasks.length} даалгавар`;
+      const today = UI.today();
+      const isLate = t => t.status !== 'done' && t.due_date && t.due_date < today;
+      const groups = {};
+      tasks.forEach(t => { (groups[t.meeting_date] = groups[t.meeting_date] || []).push(t); });
+      tBox.innerHTML = Object.keys(groups).sort().reverse().map(md => {
+        const rows = groups[md].map(t => `<div class="task-view">
+          <span class="task-status ${TASK_STATUS_TONE[t.status] || ''}">${TASK_STATUS_LABELS[t.status] || t.status}</span>
+          <div class="task-body">
+            <div class="task-txt">${UI.esc(t.task_text)}</div>
+            <div class="task-meta-row">
+              <span class="task-who">${t.assignee_name ? UI.esc(t.assignee_name) : 'Хариуцагчгүй'}</span>
+              <span class="tdates">${dateChips(t, md)}</span>
+            </div>
+            ${t.worker_note ? `<div class="task-note">${UI.esc(t.worker_note)}</div>` : ''}
+          </div>
+        </div>`).join('');
+        return `<div class="tg"><div class="tg-head">${md} хурал <span>${groups[md].length}</span></div>${rows}</div>`;
+      }).join('');
+    }
+  }
+
+
+  /* ---------------- Даалгаврын хэсэг ---------------- */
+  function taskRowHtml(t, idx){
+    const opts = ['<option value="">— хариуцагч —</option>'].concat(
+      USERS.filter(u => u.active).map(u =>
+        `<option value="${u.id}" ${String(t.assignee_id) === String(u.id) ? 'selected' : ''}>${UI.esc(u.name || u.username)}</option>`)
+    ).join('');
+    const statusOpts = Object.keys(TASK_STATUS_LABELS).map(k =>
+      `<option value="${k}" ${t.status === k ? 'selected' : ''}>${TASK_STATUS_LABELS[k]}</option>`).join('');
+    return `<div class="task-row" data-idx="${idx}" data-id="${t.id || ''}">
+      <textarea class="t-text" rows="2" placeholder="Хийгдэх ажил">${UI.esc(t.task_text || '')}</textarea>
+      <select class="t-assignee">${opts}</select>
+      <input class="t-due" type="date" value="${t.due_date || ''}">
+      <select class="t-status">${statusOpts}</select>
+      <button type="button" class="btn btn-soft btn-icon t-del" title="Устгах">✕</button>
+      ${t.worker_note ? `<div class="task-note">Ажилтны тайлбар: ${UI.esc(t.worker_note)}</div>` : ''}
+    </div>`;
+  }
+
+  function taskViewHtml(t, meetingDate){
+    return `<div class="task-view">
+      <span class="task-status ${TASK_STATUS_TONE[t.status] || ''}">${TASK_STATUS_LABELS[t.status] || t.status}</span>
+      <div class="task-body">
+        <div class="task-txt">${UI.esc(t.task_text)}</div>
+        <div class="task-meta-row">
+          <span class="task-who">${t.assignee_name ? UI.esc(t.assignee_name) : 'Хариуцагчгүй'}</span>
+          <span class="tdates">${dateChips(t, meetingDate)}</span>
+        </div>
+        ${t.worker_note ? `<div class="task-note">${UI.esc(t.worker_note)}</div>` : ''}
+      </div>
+    </div>`;
+  }
+
+  function renderTasks(){
+    const box = UI.$('#taskList');
+    if(!TASKS.length){
+      box.innerHTML = `<div class="module-empty">${isAdmin ? 'Ажил нэмээгүй байна. «+ Ажил нэмэх» дээр дарна уу.' : 'Даалгавар бүртгэгдээгүй байна.'}</div>`;
+      return;
+    }
+    if(!isAdmin){ box.innerHTML = TASKS.map(t => taskViewHtml(t, dateInput.value)).join(''); return; }
+    box.innerHTML = `<div class="task-head"><span>Хийгдэх ажил</span><span>Хариуцагч</span><span>Хугацаа</span><span>Төлөв</span><span></span></div>`
+      + TASKS.map(taskRowHtml).join('');
+    UI.$$('.t-del', box).forEach(btn => btn.onclick = () => {
+      const idx = parseInt(btn.closest('.task-row').dataset.idx, 10);
+      collectTasks();
+      TASKS.splice(idx, 1);
+      renderTasks();
+    });
+  }
+
+  function collectTasks(){
+    if(!isAdmin) return;
+    UI.$$('#taskList .task-row').forEach(row => {
+      const i = parseInt(row.dataset.idx, 10);
+      if(!TASKS[i]) return;
+      TASKS[i].task_text = row.querySelector('.t-text').value;
+      TASKS[i].assignee_id = row.querySelector('.t-assignee').value || null;
+      TASKS[i].due_date = row.querySelector('.t-due').value || null;
+      TASKS[i].status = row.querySelector('.t-status').value;
+    });
+  }
+
+  function renderNotes(){
+    const box = UI.$('#notesBox');
+    if(isAdmin){
+      box.innerHTML = `<textarea id="meetingNotes" class="notes-area" rows="6" placeholder="Хурлын шийдвэр, оролцогчид, бусад тэмдэглэл…">${UI.esc(NOTES)}</textarea>`;
+    } else {
+      box.innerHTML = NOTES
+        ? `<div class="notes-view">${UI.esc(NOTES).replace(/\n/g, '<br>')}</div>`
+        : '<div class="module-empty">Тэмдэглэл бичигдээгүй байна.</div>';
+    }
+  }
+
+  function renderPrev(res){
+    const box = UI.$('#prevTasks');
+    const sub = UI.$('#prevMeetingSub');
+    if(!res.prev || !res.prev_tasks.length){
+      sub.textContent = 'Өмнөх хурлын бүртгэл алга.';
+      box.innerHTML = '<div class="module-empty">Өмнөх хурлын даалгавар байхгүй.</div>';
+      return;
+    }
+    const done = res.prev_tasks.filter(t => t.status === 'done').length;
+    sub.textContent = `${res.prev.meeting_date} · ${done}/${res.prev_tasks.length} биелсэн`;
+    box.innerHTML = res.prev_tasks.map(t => taskViewHtml(t, res.prev.meeting_date)).join('');
+  }
+
+  async function loadMeeting(){
+    const date = dateInput.value;
+    if(!date) return;
+    UI.alertBox(msg, '');
+    UI.$('#meetingTitle').textContent = UI.formatDateMn(date);
+    UI.$('#meetingSub').textContent = 'Долоо хоногийн хурал';
+    try{
+      const res = await API.meeting(date);
+      TASKS = (res.tasks || []).map(t => ({...t}));
+      NOTES = (res.meeting && res.meeting.notes) || '';
+      renderPrev(res);
+      renderTasks();
+      renderNotes();
+    }catch(err){ UI.alertBox(msg, err.message); }
+  }
+
+  async function save(){
+    collectTasks();
+    const notesEl = UI.$('#meetingNotes');
+    const notes = notesEl ? notesEl.value : NOTES;
+    const payload = TASKS.filter(t => (t.task_text || '').trim()).map(t => ({
+      id: t.id || null, task_text: t.task_text, assignee_id: t.assignee_id,
+      due_date: t.due_date, status: t.status || 'open', worker_note: t.worker_note || ''
+    }));
+    try{
+      const res = await API.meetingSave(dateInput.value, notes, payload);
+      TASKS = (res.tasks || []).map(t => ({...t}));
+      NOTES = (res.meeting && res.meeting.notes) || '';
+      renderTasks(); renderNotes();
+      UI.alertBox(msg, 'Хурлын тэмдэглэл хадгалагдлаа.', true);
+    }catch(err){
+      if(/нэвтрэлт хүчингүй/i.test(err.message)){ SESSION.clear(); location.href = 'index.html'; return; }
+      UI.alertBox(msg, err.message);
+    }
+  }
+
+  // Админд зориулсан хяналтууд
+  if(isAdmin){
+    UI.$('#addTaskBtn').classList.remove('hidden');
+    UI.$('#meetingActions').classList.remove('hidden');
+    UI.$('#addTaskBtn').onclick = () => {
+      collectTasks();
+      TASKS.push({id:null, task_text:'', assignee_id:null, due_date:null, status:'open', worker_note:''});
+      renderTasks();
+    };
+    UI.$('#saveMeetingBtn').onclick = save;
+  }
+
+  dateInput.onchange = () => { loadMeeting(); loadKpi(); };
+
+  // Хариуцагчийн жагсаалт — зөвхөн админ авч чадна (users endpoint admin-only)
+  (async () => {
+    if(isAdmin){
+      try{ USERS = (await API.users()).users || []; }catch(e){ USERS = []; }
+    }
+    loadMeeting();
+    loadKpi();
+  })();
+};
+
+/* ================================================================
    ROUTER — хуудас бүрийн эхлүүлэгч
    ================================================================ */
 document.addEventListener('DOMContentLoaded', () => {
@@ -1909,4 +2739,5 @@ document.addEventListener('DOMContentLoaded', () => {
   if(page === 'dashboard') PageDashboard();
   if(page === 'report')    PageReport();
   if(page === 'admin')     PageAdmin();
+  if(page === 'meeting')   PageMeeting();
 });

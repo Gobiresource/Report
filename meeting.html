@@ -1,0 +1,101 @@
+<!doctype html>
+<html lang="mn">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Хурлын тэмдэглэл — GRD</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="stylesheet" href="style.css">
+</head>
+<body data-page="meeting">
+  <header class="topbar">
+    <div class="topbar-inner">
+      <a class="nameplate" href="dashboard.html">
+        <span class="nameplate-mark" aria-hidden="true"><img src="logo.png" alt="" width="38" height="38" style="display:block;border-radius:9px"></span>        <span class="nameplate-text"><h1>Говь Ресурс Девелопмент</h1><p>Хурлын тэмдэглэл</p></span>
+      </a>
+      <div class="top-actions">
+        <a class="btn btn-soft" href="report.html">Тайлан</a>
+        <a class="btn btn-soft" href="dashboard.html">Хяналтын самбар</a>
+        <a id="adminLink" class="btn btn-soft hidden" href="admin.html">Хэрэглэгчид</a>
+        <span id="userPill" class="user-pill"></span>
+        <button id="logoutBtn" class="btn btn-soft hidden">Гарах</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+
+    <section class="bezel hero"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="hero-row">
+        <div>
+          <h2 id="meetingTitle">Хурлын тэмдэглэл</h2>
+          <p id="meetingSub">Долоо хоногийн хурал</p>
+        </div>
+        <div class="date-tools">
+          <label class="mt-lbl">Хурлын огноо</label>
+          <input id="meetingDate" type="date" aria-label="Хурлын огноо">
+        </div>
+      </div>
+      <div class="hero-range">
+        <span class="hero-range-lbl">Гүйцэтгэлийг харах хугацаа</span>
+        <div class="seg-ctl" role="group">
+          <button type="button" class="seg-btn preset-btn" data-preset="week">7 хоног</button>
+          <button type="button" class="seg-btn preset-btn" data-preset="month">Сар</button>
+          <button type="button" class="seg-btn preset-btn" data-preset="q">3 сар</button>
+        </div>
+        <span class="hero-range-info" id="heroRangeInfo"></span>
+      </div>
+    </section>
+
+    <div id="meetingMessage"></div>
+
+    <section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head">
+        <div><h3>Гүйцэтгэл</h3><p id="kpiSub">Хурлын өмнөх хугацааны нэгтгэл.</p></div>
+      </div>
+      <div id="summaryCards" class="cards"></div>
+    </section>
+
+    <section class="bezel panel hidden" id="issuesPanel"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head">
+        <div><h3>Асуудлууд</h3><p id="issuesSub">Энэ хугацаанд бүртгэгдсэн асуудлууд.</p></div>
+      </div>
+      <div id="periodIssues"></div>
+    </section>
+
+    <section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head">
+        <div><h3>Өмнөх хурлын даалгавар</h3><p id="prevMeetingSub">Өмнөх хурал дээр өгсөн ажлуудын биелэлт.</p></div>
+      </div>
+      <div id="prevTasks"></div>
+    </section>
+
+    <section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head">
+        <div><h3>Энэ хурлын даалгавар</h3><p>Хийгдэх ажил, хариуцагч, хугацаа.</p></div>
+        <button class="btn btn-soft hidden" id="addTaskBtn">+ Ажил нэмэх</button>
+      </div>
+      <div id="taskList"></div>
+    </section>
+
+    <section class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head">
+        <div><h3>Тэмдэглэл</h3><p>Хурлын шийдвэр, оролцогчид, бусад тэмдэглэл.</p></div>
+      </div>
+      <div id="notesBox"></div>
+      <div class="form-actions hidden" id="meetingActions">
+        <button class="btn btn-primary" id="saveMeetingBtn">Хадгалах</button>
+      </div>
+    </section>
+
+    <section class="bezel panel hidden" id="tasksPanel"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head">
+        <div><h3>Хугацааны бүх даалгавар</h3><p id="tasksSub">Сонгосон хугацаанд өгсөн ажлууд.</p></div>
+      </div>
+      <div id="periodTasks"></div>
+    </section>
+
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

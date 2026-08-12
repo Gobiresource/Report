@@ -335,6 +335,194 @@ async function handleUserToggle(db, body) {
   return await handleUsersList(db, body);
 }
 
+// ---------- Хурлын тэмдэглэл ба даалгавар ----------
+const TASK_STATUSES = ['open', 'done', 'postponed'];
+
+/** Хурлын жагсаалт (сүүлийн 30) — нэвтэрсэн хэн ч харна */
+async function handleMeetingsList(db, body) {
+  const user = await findUser(db, body.username, body.pin);
+  if (!user || !user.active) return fail('Нэвтрэлт хүчингүй байна. Дахин нэвтэрнэ үү.', 401);
+  const rows = await db.prepare(
+    `SELECT m.id, m.meeting_date, m.notes,
+            (SELECT COUNT(*) FROM meeting_tasks t WHERE t.meeting_id = m.id) AS task_count,
+            (SELECT COUNT(*) FROM meeting_tasks t WHERE t.meeting_id = m.id AND t.status = 'done') AS done_count
+     FROM meetings m ORDER BY m.meeting_date DESC LIMIT 30`
+  ).all();
+  return ok({meetings: rows.results || []});
+}
+
+/** Нэг хурал + түүний даалгаврууд. Хурал байхгүй бол хоосон буцаана. */
+async function handleMeetingGet(db, body) {
+  const user = await findUser(db, body.username, body.pin);
+  if (!user || !user.active) return fail('Нэвтрэлт хүчингүй байна. Дахин нэвтэрнэ үү.', 401);
+  if (!body.date || !DATE_RE.test(body.date)) return fail('Хурлын огноо буруу байна.');
+  const meeting = await db.prepare(
+    `SELECT id, meeting_date, notes, updated_at FROM meetings WHERE meeting_date = ? LIMIT 1`
+  ).bind(body.date).first();
+  if (!meeting) return ok({meeting: null, tasks: [], prev: null, prev_tasks: []});
+
+  const tasks = await db.prepare(
+    `SELECT t.id, t.task_text, t.assignee_id, t.due_date, t.status, t.worker_note, t.sort_order,
+            u.name AS assignee_name, u.username AS assignee_username
+     FROM meeting_tasks t LEFT JOIN users u ON u.id = t.assignee_id
+     WHERE t.meeting_id = ? ORDER BY t.sort_order, t.id`
+  ).bind(meeting.id).all();
+
+  // Өмнөх хурлын даалгавар — хурал дээр эргэж шалгах зорилгоор
+  const prev = await db.prepare(
+    `SELECT id, meeting_date FROM meetings WHERE meeting_date < ? ORDER BY meeting_date DESC LIMIT 1`
+  ).bind(body.date).first();
+  let prevTasks = [];
+  if (prev) {
+    const pt = await db.prepare(
+      `SELECT t.id, t.task_text, t.assignee_id, t.due_date, t.status, t.worker_note,
+              u.name AS assignee_name
+       FROM meeting_tasks t LEFT JOIN users u ON u.id = t.assignee_id
+       WHERE t.meeting_id = ? ORDER BY t.sort_order, t.id`
+    ).bind(prev.id).all();
+    prevTasks = pt.results || [];
+  }
+  return ok({meeting, tasks: tasks.results || [], prev: prev || null, prev_tasks: prevTasks});
+}
+
+/** Хурал үүсгэх/хадгалах — тэмдэглэл + бүх даалгавар (admin) */
+async function handleMeetingSave(db, body) {
+  const {user, err} = await requireAdmin(db, body);
+  if (err) return err;
+  if (!body.date || !DATE_RE.test(body.date)) return fail('Хурлын огноо буруу байна.');
+
+  const notes = String(body.notes || '').slice(0, 8000);
+  await db.prepare(
+    `INSERT INTO meetings (meeting_date, notes, created_by, updated_at)
+     VALUES (?, ?, ?, datetime('now'))
+     ON CONFLICT(meeting_date) DO UPDATE SET notes = excluded.notes, updated_at = datetime('now')`
+  ).bind(body.date, notes, user.id).run();
+
+  const meeting = await db.prepare(`SELECT id FROM meetings WHERE meeting_date = ? LIMIT 1`)
+    .bind(body.date).first();
+
+  // Даалгаврууд: бүтнээр нь солино. Ажилтны сонгосон төлөв/тайлбарыг
+  // хадгалахын тулд client нь id-тайгаа буцааж илгээдэг.
+  if (Array.isArray(body.tasks)) {
+    const incoming = body.tasks
+      .map((t, i) => ({
+        id: t.id ? parseInt(t.id, 10) : null,
+        task_text: String(t.task_text || '').trim().slice(0, 1000),
+        assignee_id: t.assignee_id ? parseInt(t.assignee_id, 10) : null,
+        due_date: (t.due_date && DATE_RE.test(t.due_date)) ? t.due_date : null,
+        status: TASK_STATUSES.includes(t.status) ? t.status : 'open',
+        worker_note: String(t.worker_note || '').slice(0, 1000),
+        sort_order: i
+      }))
+      .filter(t => t.task_text);
+
+    const keepIds = incoming.filter(t => t.id).map(t => t.id);
+    if (keepIds.length) {
+      await db.prepare(
+        `DELETE FROM meeting_tasks WHERE meeting_id = ? AND id NOT IN (${keepIds.map(() => '?').join(',')})`
+      ).bind(meeting.id, ...keepIds).run();
+    } else {
+      await db.prepare(`DELETE FROM meeting_tasks WHERE meeting_id = ?`).bind(meeting.id).run();
+    }
+
+    for (const t of incoming) {
+      if (t.id) {
+        await db.prepare(
+          `UPDATE meeting_tasks SET task_text=?, assignee_id=?, due_date=?, status=?,
+                  worker_note=?, sort_order=?, updated_at=datetime('now')
+           WHERE id=? AND meeting_id=?`
+        ).bind(t.task_text, t.assignee_id, t.due_date, t.status, t.worker_note, t.sort_order, t.id, meeting.id).run();
+      } else {
+        await db.prepare(
+          `INSERT INTO meeting_tasks (meeting_id, task_text, assignee_id, due_date, status, worker_note, sort_order)
+           VALUES (?, ?, ?, ?, ?, ?, ?)`
+        ).bind(meeting.id, t.task_text, t.assignee_id, t.due_date, t.status, t.worker_note, t.sort_order).run();
+      }
+    }
+  }
+  await logAction(db, user.id, 'meeting_save', body.date, {tasks: (body.tasks || []).length});
+  return await handleMeetingGet(db, body);
+}
+
+/** Ажилтанд оногдсон даалгаврууд (өөрийн) */
+async function handleMyTasks(db, body) {
+  const user = await findUser(db, body.username, body.pin);
+  if (!user || !user.active) return fail('Нэвтрэлт хүчингүй байна. Дахин нэвтэрнэ үү.', 401);
+  const rows = await db.prepare(
+    `SELECT t.id, t.task_text, t.due_date, t.status, t.worker_note, m.meeting_date
+     FROM meeting_tasks t JOIN meetings m ON m.id = t.meeting_id
+     WHERE t.assignee_id = ?
+     ORDER BY (t.status = 'done') ASC, COALESCE(t.due_date, m.meeting_date) ASC
+     LIMIT 60`
+  ).bind(user.id).all();
+  return ok({tasks: rows.results || []});
+}
+
+/** Ажилтан өөрийн даалгаврын төлөв + тайлбарыг шинэчилнэ */
+async function handleTaskStatus(db, body) {
+  const user = await findUser(db, body.username, body.pin);
+  if (!user || !user.active) return fail('Нэвтрэлт хүчингүй байна. Дахин нэвтэрнэ үү.', 401);
+  const taskId = parseInt(body.task_id, 10);
+  if (!taskId) return fail('Даалгаврын ID байхгүй.');
+  const status = TASK_STATUSES.includes(body.status) ? body.status : null;
+  if (!status) return fail('Төлөв буруу байна.');
+  const note = String(body.worker_note || '').slice(0, 1000);
+
+  const task = await db.prepare(`SELECT id, assignee_id FROM meeting_tasks WHERE id = ? LIMIT 1`)
+    .bind(taskId).first();
+  if (!task) return fail('Даалгавар олдсонгүй.', 404);
+  // Зөвхөн хариуцагч өөрөө эсвэл админ өөрчилнө
+  if (user.role !== 'admin' && task.assignee_id !== user.id) {
+    return fail('Энэ даалгаврыг өөрчлөх эрх байхгүй.', 403);
+  }
+  await db.prepare(
+    `UPDATE meeting_tasks SET status = ?, worker_note = ?, updated_at = datetime('now') WHERE id = ?`
+  ).bind(status, note, taskId).run();
+  await logAction(db, user.id, 'task_status', String(taskId), {status});
+  return await handleMyTasks(db, body);
+}
+
+/** Хугацааны интервалын тайлан (хурлын гүйцэтгэлийн хэсэгт) */
+async function handleRange(db, body) {
+  const user = await findUser(db, body.username, body.pin);
+  if (!user || !user.active) return fail('Нэвтрэлт хүчингүй байна. Дахин нэвтэрнэ үү.', 401);
+  if (!body.from || !DATE_RE.test(body.from)) return fail('Эхлэх огноо буруу байна.');
+  if (!body.to || !DATE_RE.test(body.to)) return fail('Дуусах огноо буруу байна.');
+
+  const rows = await db.prepare(
+    `SELECT r.date, r.report_type, r.data_json, r.updated_at
+     FROM reports r WHERE r.date >= ? AND r.date <= ?
+     ORDER BY r.date, r.report_type, r.updated_at DESC`
+  ).bind(body.from, body.to).all();
+
+  const seen = new Set();
+  const reports = [];
+  for (const row of (rows.results || [])) {
+    const key = row.date + '|' + row.report_type;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    reports.push({date: row.date, report_type: row.report_type, data: parseJsonColumn(row.data_json)});
+  }
+
+  // Тухайн хугацаанд ӨГСӨН даалгаврууд (хурлын огноогоор шүүнэ).
+  // Хүснэгт үүсээгүй бол алдаа гаргалгүй хоосон буцаана.
+  let tasks = [];
+  try {
+    const tr = await db.prepare(
+      `SELECT t.id, t.task_text, t.due_date, t.status, t.worker_note,
+              m.meeting_date, u.name AS assignee_name
+       FROM meeting_tasks t
+       JOIN meetings m ON m.id = t.meeting_id
+       LEFT JOIN users u ON u.id = t.assignee_id
+       WHERE m.meeting_date >= ? AND m.meeting_date <= ?
+       ORDER BY m.meeting_date DESC, t.sort_order, t.id`
+    ).bind(body.from, body.to).all();
+    tasks = tr.results || [];
+  } catch (e) { tasks = []; }
+
+  return ok({from: body.from, to: body.to, reports, tasks});
+}
+
 /* ---------------------------------------------------------------
    Entry point
    --------------------------------------------------------------- */
@@ -361,6 +549,12 @@ export async function onRequest(context) {
     if (method === 'POST' && route === 'users/rename') return await handleUserRename(env.DB, await readBody(request));
     if (method === 'POST' && route === 'users/create') return await handleUserCreate(env.DB, await readBody(request));
     if (method === 'POST' && route === 'users/toggle') return await handleUserToggle(env.DB, await readBody(request));
+    if (method === 'POST' && route === 'meetings')       return await handleMeetingsList(env.DB, await readBody(request));
+    if (method === 'POST' && route === 'meeting')        return await handleMeetingGet(env.DB, await readBody(request));
+    if (method === 'POST' && route === 'meeting/save')   return await handleMeetingSave(env.DB, await readBody(request));
+    if (method === 'POST' && route === 'tasks/mine')     return await handleMyTasks(env.DB, await readBody(request));
+    if (method === 'POST' && route === 'tasks/status')   return await handleTaskStatus(env.DB, await readBody(request));
+    if (method === 'POST' && route === 'range')          return await handleRange(env.DB, await readBody(request));
     return fail('API endpoint олдсонгүй: ' + route, 404);
   } catch (err) {
     return fail(err.message || 'Серверийн алдаа гарлаа.', 500);
