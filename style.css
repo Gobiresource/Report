@@ -1220,3 +1220,72 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
   .issue-dept{flex:1 0 auto}
   .issue-tags{flex:0 0 auto}
 }
+
+
+/* ЦАГ АГААРЫН КАРТ — ХАБЭА тайлангийн 4 утгыг харуулна.
+   Hero-гийн хажууд, дээд мөрөнд багтана. */
+.top-row{display:flex;gap:14px;align-items:stretch;margin-bottom:18px}
+.top-row > .hero{flex:1 1 auto;margin-bottom:0;min-width:0}
+/* 523px өргөн = 182px өндөр (920:320) — hero-гийн өндөртэй яг таарна.
+   Сүүдэр, хүрээ, радиус, градиент бүгд hero-той нэг хэмнэлд оруулсан. */
+.wxc-wrap{flex:0 0 523px;max-width:523px;display:flex;align-items:center}
+.wxc-wrap .wxc-svg{display:block;width:100%;height:auto;
+  filter:drop-shadow(0 16px 44px rgba(188,32,41,.35))}
+.wxc-wrap.hidden{display:none}
+@media (max-width:980px){
+  .top-row{flex-direction:column}
+  .wxc-wrap{flex:1 1 auto;max-width:none}
+  .wxc-wrap .wxc-svg{width:100%;height:auto}
+}
+
+/* --- Жижиг хөдөлгөөнүүд --- */
+.wxc-svg .wx-glow,.wxc-svg .wx-rays{transform-box:view-box;transform-origin:739px 102px}
+.wxc-svg .wx-glow{animation:wxGlow 6.5s ease-in-out infinite}
+@keyframes wxGlow{0%,100%{opacity:.7}50%{opacity:1}}
+.wxc-svg .wx-rays{animation:wxRays 120s linear infinite}
+@keyframes wxRays{to{transform:rotate(360deg)}}
+.wxc-svg .wx-clouds{transform-box:view-box;animation:wxCloud 19s ease-in-out infinite}
+@keyframes wxCloud{0%,100%{transform:translateX(0)}50%{transform:translateX(-10px)}}
+/* Ачаалах агшны богино мандалт */
+.wxc-svg .wx-pill,.wxc-svg .wx-now,.wxc-svg .wx-stats{transform-box:view-box;opacity:0;
+  animation:wxUp .5s cubic-bezier(.23,1,.32,1) forwards}
+.wxc-svg .wx-pill{animation-delay:.05s}
+.wxc-svg .wx-now{animation-delay:.14s}
+.wxc-svg .wx-stats{animation-delay:.24s}
+@keyframes wxUp{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
+@media (prefers-reduced-motion:reduce){
+  .wxc-svg .wx-glow,.wxc-svg .wx-rays,.wxc-svg .wx-clouds{animation:none}
+  .wxc-svg .wx-pill,.wxc-svg .wx-now,.wxc-svg .wx-stats{animation:none;opacity:1;transform:none}
+}
+
+
+/* --- Hero доторх байрлал --- */
+.hero-row{flex-wrap:nowrap;align-items:center}
+.hero-main{min-width:0}
+.hero-main .date-tools{margin-top:14px}
+
+/* --- Осол гэмтэлгүй ажилласан хоног: бүтэн өргөнтэй зурвас --- */
+.safety-bar{
+  display:flex;align-items:center;gap:14px;margin:0 0 18px;
+  padding:14px 20px;border-radius:var(--radius-md);
+  background:rgba(52,199,89,.10);border:1px solid rgba(52,199,89,.24);
+}
+.safety-bar.hidden{display:none}
+.safety-bar .sb-ico{flex:none;display:grid;place-items:center;width:38px;height:38px;
+  border-radius:11px;background:rgba(52,199,89,.16)}
+.safety-bar .sb-l{font-size:10.5px;font-weight:700;letter-spacing:.07em;
+  text-transform:uppercase;color:#3B7A4E}
+.safety-bar .sb-v{font-size:26px;font-weight:800;letter-spacing:-.03em;line-height:1.05;
+  color:#1E7A3C;font-variant-numeric:tabular-nums}
+.safety-bar .sb-v small{font-size:13px;font-weight:600;color:#4E8A63;margin-left:3px;letter-spacing:0}
+.safety-bar .sb-sub{margin-left:auto;font-size:12px;font-weight:600;color:#5B8A6B;text-align:right}
+/* Өнөөдөр тохиолдол бүртгэгдсэн бол улбар шар болно */
+.safety-bar.warn{background:rgba(232,89,12,.09);border-color:rgba(232,89,12,.26)}
+.safety-bar.warn .sb-ico{background:rgba(232,89,12,.15)}
+.safety-bar.warn .sb-l{color:#A2530F}
+.safety-bar.warn .sb-v{color:var(--warn)}
+.safety-bar.warn .sb-v small,.safety-bar.warn .sb-sub{color:#9C5C22}
+@media (max-width:720px){
+  .safety-bar{flex-wrap:wrap}
+  .safety-bar .sb-sub{margin-left:0;width:100%;text-align:left}
+}

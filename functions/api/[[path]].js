@@ -489,9 +489,12 @@ async function handleRange(db, body) {
   if (!body.from || !DATE_RE.test(body.from)) return fail('Эхлэх огноо буруу байна.');
   if (!body.to || !DATE_RE.test(body.to)) return fail('Дуусах огноо буруу байна.');
 
+  // submitted_by_name ба updated_at-ыг МӨН буцаана — самбарын «Тайлангийн ирц»
+  // хэсэг «Илгээсэн: 09:05 · Тээвэр ажилтан» гэж бичихэд эдгээр шаардлагатай.
   const rows = await db.prepare(
-    `SELECT r.date, r.report_type, r.data_json, r.updated_at
-     FROM reports r WHERE r.date >= ? AND r.date <= ?
+    `SELECT r.date, r.report_type, r.data_json, r.updated_at, u.name AS submitted_by_name
+     FROM reports r LEFT JOIN users u ON u.id = r.submitted_by
+     WHERE r.date >= ? AND r.date <= ?
      ORDER BY r.date, r.report_type, r.updated_at DESC`
   ).bind(body.from, body.to).all();
 
@@ -501,7 +504,8 @@ async function handleRange(db, body) {
     const key = row.date + '|' + row.report_type;
     if (seen.has(key)) continue;
     seen.add(key);
-    reports.push({date: row.date, report_type: row.report_type, data: parseJsonColumn(row.data_json)});
+    reports.push({date: row.date, report_type: row.report_type, updated_at: row.updated_at,
+                  submitted_by_name: row.submitted_by_name, data: parseJsonColumn(row.data_json)});
   }
 
   // Тухайн хугацаанд ӨГСӨН даалгаврууд (хурлын огноогоор шүүнэ).

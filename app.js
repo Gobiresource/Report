@@ -665,6 +665,9 @@ const PageLogin = () => {
    ================================================================ */
 const KpiCards = (() => {
   const SEV_RANK  = {high:0, medium:1, low:2};
+  // Ноцтой байдлын монгол нэршил. ЭНД байх ёстой — асуудлын жагсаалтыг
+  // KpiCards зурдаг тул PageDashboard дотор байвал «SEV_LABEL is not defined» гэж унана.
+  const SEV_LABEL = {low:'Бага', medium:'Дунд', high:'Өндөр'};
 
   function collectIssues(dailyMap){
     const out = [];
@@ -1203,6 +1206,8 @@ const PageDashboard = () => {
       renderStatusRow();
       KpiCards.render(UI.$('#summaryCards'), dailyMap, dailyPrevMap,
                       {plan: dashPlan, date: dashDate, span: dashSpan});
+      renderWeather(dailyMap.hse);
+      renderSafety(periodTo);
       renderPeriodExtras(cur);
     }catch(err){
       if(/нэвтрэлт|эрхгүй/i.test(err.message)){ SESSION.clear(); location.href = 'index.html'; return; }
@@ -1211,6 +1216,77 @@ const PageDashboard = () => {
     }
   }
   const loadDaily = () => setPeriod(periodKind);   // хуучин дуудлагатай нийцүүлэх
+
+  /* ---------------- Осол гэмтэлгүй ажилласан хоног ----------------
+     Сүүлийн 45 хоногийн ХАБЭА тайлангаас зөрчил/эмнэлгийн тусламж бүртгэгдсэн
+     хамгийн сүүлийн өдрийг олж, түүнээс хойшхи хоногийг тоолно.
+     Тайлан бүрэн болсны дараа энэ тоог ХАБЭА-гийн form өөрөө өгнө. */
+  let safetyCache = {key:null, value:null};
+  async function renderSafety(anchor){
+    const box = UI.$('#safetyBlock');
+    if(!box) return;
+    if(safetyCache.key !== anchor){
+      safetyCache.key = anchor;
+      try{
+        const from = RangeReport.addDays(anchor, -45);
+        const res = await API.range(from, anchor);
+        const bad = (res.reports || [])
+          .filter(r => r.report_type === 'hse')
+          .filter(r => (parseFloat((r.data||{}).hse_violation_count) || 0) > 0
+                    || (parseFloat((r.data||{}).medical_assistance_count) || 0) > 0)
+          .map(r => r.date).sort();
+        safetyCache.value = bad.length ? bad[bad.length - 1] : null;
+      }catch(e){ safetyCache.value = undefined; }
+    }
+    const last = safetyCache.value;
+    if(last === undefined){ box.classList.add('hidden'); return; }
+    const days = (last === null) ? 45 : RangeReport.daysBetween(last, anchor);
+    const shield = '<span class="sb-ico"><svg width="21" height="21" viewBox="0 0 24 24" fill="none" '
+      + 'stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">'
+      + '<path d="M12 2 4.5 5v6c0 5 3.2 8.7 7.5 11 4.3-2.3 7.5-6 7.5-11V5L12 2z"/>'
+      + '<path d="m8.8 12 2.2 2.2 4.2-4.4"/></svg></span>';
+    box.classList.remove('hidden');
+    box.classList.toggle('warn', days === 0);
+    box.innerHTML = shield + `<div>
+      <div class="sb-l">Осол гэмтэлгүй ажилласан</div>
+      <div class="sb-v">${last === null ? days + '+' : days}<small>хоног</small></div>
+    </div>
+    <div class="sb-sub">${last === null ? 'Сүүлийн 45 хоногт зөрчил, эмнэлгийн тусламж бүртгэгдээгүй'
+      : (days === 0 ? 'Өнөөдөр тохиолдол бүртгэгдлээ' : 'Сүүлийн тохиолдол · ' + last)}</div>`;
+  }
+
+  /* ---------------- Цаг агаарын карт ----------------
+     ХАБЭА тайлангийн 4 утгыг dashboard.html дахь SVG-д суулгана.
+     Тайлан ирээгүй бол картыг бүрэн нуух. */
+  function renderWeather(hse){
+    const wrap = UI.$('#weatherCard');
+    if(!wrap) return;
+    const d = (hse && hse.data) || {};
+    const has = ['day_temp_c','night_temp_c','humidity_percent','wind_speed_ms']
+      .some(k => d[k] !== undefined && d[k] !== null && d[k] !== '');
+    wrap.classList.toggle('hidden', !has);
+    if(!has) return;
+
+    const num = v => { const x = parseFloat(v); return isNaN(x) ? null : Math.round(x * 10) / 10; };
+    const txt = (id, v) => { const el = UI.$('#' + id); if(el) el.textContent = v; };
+    const day = num(d.day_temp_c), night = num(d.night_temp_c),
+          hum = num(d.humidity_percent), wind = num(d.wind_speed_ms);
+    const dash = v => (v === null ? '—' : v);
+
+    txt('location-text', 'Үйлдвэрийн талбай');
+    txt('temperature', dash(day));
+    txt('weather-condition', 'Өдрийн ээлжийн хэм');
+    txt('date-text', 'ХАБЭА-гийн тайлангаас');
+    txt('night-temperature', night === null ? '—' : night + '°');
+    txt('humidity', hum === null ? '—' : hum + '%');
+    // wind-speed доторх tspan (нэгж) хэвээр үлдэх ёстой тул зөвхөн эхний текст зангилааг солино
+    const w = UI.$('#wind-speed');
+    if(w && w.firstChild) w.firstChild.nodeValue = (wind === null ? '— ' : wind + ' ');
+
+    const desc = UI.$('#weather-card-description');
+    if(desc) desc.textContent =
+      `Өдрийн ээлж ${dash(day)} хэм, шөнийн ээлж ${dash(night)} хэм, чийг ${dash(hum)} хувь, салхи ${dash(wind)} метр секунд.`;
+  }
 
   /** Хугацааны нэмэлт хэсгүүд: хурлын даалгавар ба асуудлын жагсаалт.
       Хоёулаа тусдаа панелд, өгөгдөлгүй бол нуугдана. */
@@ -1389,8 +1465,8 @@ const PageDashboard = () => {
 
   /* ---------------- Асуудлын нэгтгэл ----------------
      Хэлтэс бүрийн тайлангийн issue_text-ийг цуглуулж, ноцтой байдлаар нь
-     эрэмбэлэн, хэлтсийн өнгө/icon-оор ялгаж нэг картад харуулна. */
-  const SEV_LABEL = {low:'Бага', medium:'Дунд', high:'Өндөр'};
+     эрэмбэлэн, хэлтсийн өнгө/icon-оор ялгаж нэг картад харуулна.
+     Энэ ажлыг одоо KpiCards модуль гүйцэтгэдэг — SEV_LABEL мөн тийшээ шилжсэн. */
 
   function renderModuleDetail(key){
     const r = dailyMap[key];
@@ -1861,6 +1937,11 @@ const PageReport = () => {
 
   UI.$('#reportDate').value = UI.today();
 
+  /* Машины жагсаалт. ЗААВАЛ энд (доор биш) зарлагдана — эхний selectReport()
+     дуудлага үүнээс өмнө ажилладаг тул доор зарлавал зөвхөн Тээвэр/Түлш эрхтэй
+     хэрэглэгчид «Cannot access 'VEHICLES' before initialization» гэж унана. */
+  let VEHICLES = [];
+
   const roleKey = session.role;
   const dept = CONFIG.reportTypes.find(t => t.key === session.department);
   const confirmBox = UI.$('#accessConfirm');
@@ -1978,8 +2059,8 @@ const PageReport = () => {
     form.onsubmit = submitReport;
   }
 
-  /* ---------------- Машины бүртгэл (registry) ---------------- */
-  let VEHICLES = [];
+  /* ---------------- Машины бүртгэл (registry) ----------------
+     VEHICLES-ийг PageReport-ын эхэнд зарласан (дээрх тайлбарыг үз). */
   async function loadVehicles(){
     try{ VEHICLES = (await API.vehicles()).vehicles || []; }
     catch(e){ VEHICLES = []; }
