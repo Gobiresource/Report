@@ -16,3 +16,8 @@ _v20_design_backup.zip
 *-design-source.zip
 transport-icons-svg.zip
 Codex Image*.png
+
+# Claude Code-ийн skill/тохиргоо (npx skills add-аар суудаг, эх код биш)
+.agents/
+.claude/
+skills-lock.json
