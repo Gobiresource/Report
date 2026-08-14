@@ -1256,16 +1256,14 @@ const PageDashboard = () => {
   }
 
   /* ---------------- Цаг агаарын карт ----------------
-     ХАБЭА тайлангийн 4 утгыг dashboard.html дахь SVG-д суулгана.
-     Тайлан ирээгүй бол картыг бүрэн нуух. */
+     ХАБЭА тайлангийн 4 утгыг dashboard.html дахь картад суулгана.
+     V19.5 (2026-08-14): тайлан ирээгүй өдөр картыг НУУХГҮЙ — «—» утгатай
+     харуулна. Нуувал дээд мөр 2 карт болж эвдэрч харагддаг байсан. */
   function renderWeather(hse){
     const wrap = UI.$('#weatherCard');
     if(!wrap) return;
     const d = (hse && hse.data) || {};
-    const has = ['day_temp_c','night_temp_c','humidity_percent','wind_speed_ms']
-      .some(k => d[k] !== undefined && d[k] !== null && d[k] !== '');
-    wrap.classList.toggle('hidden', !has);
-    if(!has) return;
+    wrap.classList.remove('hidden');
 
     const num = v => { const x = parseFloat(v); return isNaN(x) ? null : Math.round(x * 10) / 10; };
     const txt = (id, v) => { const el = UI.$('#' + id); if(el) el.textContent = v; };
