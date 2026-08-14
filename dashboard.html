@@ -29,174 +29,100 @@
   <main class="main">
 
     <div class="top-row">
-      <section class="bezel hero"><span class="tick-a"></span><span class="tick-b"></span>
-        <div class="hero-row">
-          <div class="hero-main">
-            <h2 id="heroDate">Хяналтын самбар</h2>
-            <p id="heroDateLine">Тайлангийн нэгтгэл</p>
-            <div class="date-tools">
-              <button class="btn btn-icon btn-soft" id="prevDayBtn" title="Өмнөх өдөр">‹</button>
-              <input id="dashboardDate" type="date" aria-label="Огноо сонгох">
-              <button class="btn btn-icon btn-soft" id="nextDayBtn" title="Дараагийн өдөр">›</button>
-            </div>
-          </div>
+
+      <div class="safety-bar hidden" id="safetyBlock"></div>
+
+      <section class="card date-card">
+        <div>
+          <h2 id="heroDate">Хяналтын самбар</h2>
+          <p class="subtitle" id="heroDateLine">Тайлангийн нэгтгэл</p>
+        </div>
+        <div class="date-controls">
+          <button class="nav" id="prevDayBtn" type="button" aria-label="Өмнөх өдөр">
+            <svg viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></svg>
+          </button>
+          <input id="dashboardDate" type="date" aria-label="Огноо сонгох">
+          <button class="nav" id="nextDayBtn" type="button" aria-label="Дараагийн өдөр">
+            <svg viewBox="0 0 24 24"><path d="M9 18l6-6-6-6"/></svg>
+          </button>
         </div>
       </section>
 
-      <section class="wxc-wrap" id="weatherCard">
-        <svg class="wxc-svg" xmlns="http://www.w3.org/2000/svg"
-             xmlns:xlink="http://www.w3.org/1999/xlink"
-             viewBox="0 0 920 320"
-             fill="none"
-             role="img"
-             aria-labelledby="weather-card-title weather-card-description">
-          <title id="weather-card-title">Уурхайн талбайн цаг агаар</title>
-          <desc id="weather-card-description">29 хэм, багавтар үүлтэй. Шөнөдөө 15 хэм, чийгшил 21 хувь, салхи 14 метр секунд.</desc>
-        
-          <defs>
-            <linearGradient id="card-gradient" x1="0" y1="0" x2="920" y2="320" gradientUnits="userSpaceOnUse">
-              <stop offset="0" stop-color="#D22833"/>
-              <stop offset="0.45" stop-color="#BC2029"/>
-              <stop offset="1" stop-color="#8C161D"/>
-            </linearGradient>
-            <linearGradient id="card-shine" x1="108" y1="-20" x2="658" y2="350" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#FFFFFF" stop-opacity="0.15"/>
-              <stop offset="0.48" stop-color="#FFFFFF" stop-opacity="0"/>
-            </linearGradient>
-            <linearGradient id="cloud-front" x1="697" y1="145" x2="697" y2="224" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#FFFFFF"/>
-              <stop offset="1" stop-color="#E9EBF8"/>
-            </linearGradient>
-            <linearGradient id="cloud-back" x1="748" y1="127" x2="748" y2="205" gradientUnits="userSpaceOnUse">
-              <stop stop-color="#FFFFFF" stop-opacity="0.95"/>
-              <stop offset="1" stop-color="#DADCEC" stop-opacity="0.88"/>
-            </linearGradient>
-            <radialGradient id="sun-fill" cx="0" cy="0" r="1" gradientTransform="translate(739 102) rotate(132) scale(83)">
-              <stop stop-color="#FFE7A4"/>
-              <stop offset="0.55" stop-color="#FFD266"/>
-              <stop offset="1" stop-color="#FFB436"/>
-            </radialGradient>
-            <radialGradient id="sun-glow" cx="0" cy="0" r="1" gradientTransform="translate(739 102) rotate(90) scale(100)">
-              <stop stop-color="#FFC64D" stop-opacity="0.35"/>
-              <stop offset="1" stop-color="#FFC64D" stop-opacity="0"/>
-            </radialGradient>
-            <pattern id="weather-pattern" width="38" height="38" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
-              <path d="M0 0V38" stroke="#FFFFFF" stroke-opacity="0.035"/>
-            </pattern>
-            <filter id="card-shadow" x="-8%" y="-12%" width="116%" height="138%" color-interpolation-filters="sRGB">
-              <feDropShadow dx="0" dy="14" stdDeviation="16" flood-color="#841927" flood-opacity="0.22"/>
-            </filter>
-            <filter id="sun-shadow" x="-90%" y="-90%" width="280%" height="280%" color-interpolation-filters="sRGB">
-              <feDropShadow dx="0" dy="5" stdDeviation="12" flood-color="#FFB22F" flood-opacity="0.45"/>
-            </filter>
-            <filter id="cloud-shadow" x="-25%" y="-35%" width="155%" height="180%" color-interpolation-filters="sRGB">
-              <feDropShadow dx="0" dy="9" stdDeviation="10" flood-color="#4B1739" flood-opacity="0.24"/>
-            </filter>
-            <filter id="stat-shadow" x="-12%" y="-30%" width="124%" height="175%" color-interpolation-filters="sRGB">
-              <feDropShadow dx="0" dy="4" stdDeviation="7" flood-color="#55132B" flood-opacity="0.13"/>
-            </filter>
-            <clipPath id="card-clip">
-              <rect x="0" y="0" width="920" height="320" rx="22"/>
-            </clipPath>
-          </defs>
-        
-          <g>
-            <rect x="0" y="0" width="920" height="320" rx="22" fill="url(#card-gradient)"/>
-            <rect x="0.75" y="0.75" width="918.5" height="318.5" rx="21.25" stroke="#FFFFFF" stroke-opacity="0.35" stroke-width="1.5"/>
-          </g>
-        
-          <g clip-path="url(#card-clip)">
-            <rect width="920" height="320" fill="url(#weather-pattern)"/>
-            <ellipse cx="117" cy="27" rx="306" ry="174" fill="url(#card-shine)"/>
-            <circle cx="902" cy="-10" r="182" fill="#501F4A" fill-opacity="0.12"/>
-          </g>
-        
-          <!-- Context pill -->
-          <g id="context-pill" class="wx-pill">
-            <rect x="34" y="30" width="278" height="44" rx="22" fill="#FFFFFF" fill-opacity="0.12"/>
-            <rect x="34.75" y="30.75" width="276.5" height="42.5" rx="21.25" stroke="#FFFFFF" stroke-opacity="0.23" stroke-width="1.5"/>
-            <g transform="translate(52 42)" stroke="#FFFFFF" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M8 20s7-6.08 7-12A7 7 0 1 0 1 8c0 5.92 7 12 7 12Z"/>
-              <circle cx="8" cy="8" r="2.35"/>
-            </g>
-            <text id="location-text" x="81" y="58" fill="#FFFFFF" font-size="15" font-weight="700">Уурхайн талбай</text>
-            <circle cx="286" cy="52" r="3" fill="#65E6A5"/>
-          </g>
-        
-          <!-- Main weather reading -->
-          <g id="current-weather" class="wx-now">
-            <text id="temperature" x="36" y="174" fill="#FFFFFF" font-size="78" font-weight="800" letter-spacing="-4">29</text>
-            <text id="temperature-unit" x="134" y="151" fill="#FFFFFF" font-size="35" font-weight="700">°C</text>
-            <text id="weather-condition" x="38" y="199" fill="#FFFFFF" font-size="18" font-weight="700">Багавтар үүлтэй</text>
-            <text id="date-text" x="38" y="222" fill="#FFFFFF" fill-opacity="0.76" font-size="14.5" font-weight="500">2026 оны 8-р сарын 12 · Лхагва гараг</text>
-          </g>
-        
-          <!-- Sun and cloud illustration -->
-          <g id="weather-illustration">
-            <circle class="wx-glow" cx="739" cy="102" r="100" fill="url(#sun-glow)"/>
-            <g class="wx-rays" stroke="#FFC14A" stroke-width="8" stroke-linecap="round" filter="url(#sun-shadow)">
-              <path d="M739 29V15"/>
-              <path d="M790 50l11-12"/>
-              <path d="M811 102h17"/>
-              <path d="M688 50l-11-12"/>
-              <path d="M667 102h-17"/>
-            </g>
-            <circle cx="739" cy="102" r="48" fill="url(#sun-fill)" filter="url(#sun-shadow)"/>
-        
-            <g class="wx-clouds" filter="url(#cloud-shadow)">
-              <path d="M697 213h132c22 0 39-13 39-31s-16-30-35-31c-6-22-26-36-50-36-20 0-37 10-46 26-8-7-18-11-30-11-24 0-43 18-43 41v3c-17 4-29 18-29 34 0 3 .4 5 1 7 10-1 31-2 61-2Z" fill="url(#cloud-back)"/>
-              <path d="M632 222h151c20 0 35-13 35-30 0-18-16-31-37-31-4 0-8 .5-12 1-8-19-27-32-50-32-28 0-50 19-54 44-5-2-11-3-17-3-23 0-42 16-42 36 0 5 1 10 4 15h22Z" fill="url(#cloud-front)"/>
-              <rect x="610" y="193" width="208" height="38" rx="19" fill="url(#cloud-front)"/>
-              <path d="M625 207h173" stroke="#FFFFFF" stroke-opacity="0.48" stroke-width="2" stroke-linecap="round"/>
-            </g>
-          </g>
-        
-          <!-- Bottom data tiles -->
-          <g id="weather-stats" class="wx-stats" filter="url(#stat-shadow)">
-            <g id="night-stat">
-              <rect x="34" y="246" width="264" height="52" rx="16" fill="#FFFFFF" fill-opacity="0.115"/>
-              <rect x="34.75" y="246.75" width="262.5" height="50.5" rx="15.25" stroke="#FFFFFF" stroke-opacity="0.21" stroke-width="1.5"/>
-              <g transform="translate(50 260)" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M15.7 17.8A9.2 9.2 0 0 1 7.2 4a8.4 8.4 0 1 0 8.5 13.8Z"/>
-              </g>
-              <text x="83" y="267" fill="#FFFFFF" fill-opacity="0.7" font-size="11.5" font-weight="600">ШӨНИЙН ТЕМП.</text>
-              <text id="night-temperature" x="83" y="287" fill="#FFFFFF" font-size="18" font-weight="800">15°</text>
-            </g>
-        
-            <g id="humidity-stat">
-              <rect x="312" y="246" width="264" height="52" rx="16" fill="#FFFFFF" fill-opacity="0.115"/>
-              <rect x="312.75" y="246.75" width="262.5" height="50.5" rx="15.25" stroke="#FFFFFF" stroke-opacity="0.21" stroke-width="1.5"/>
-              <g transform="translate(330 259)" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M9 1.5S2 9.7 2 14.2A7 7 0 0 0 16 14.2C16 9.7 9 1.5 9 1.5Z"/>
-              </g>
-              <text x="363" y="267" fill="#FFFFFF" fill-opacity="0.7" font-size="11.5" font-weight="600">АГААРЫН ЧИЙГШИЛ</text>
-              <text id="humidity" x="363" y="287" fill="#FFFFFF" font-size="18" font-weight="800">21%</text>
-            </g>
-        
-            <g id="wind-stat">
-              <rect x="590" y="246" width="296" height="52" rx="16" fill="#FFFFFF" fill-opacity="0.115"/>
-              <rect x="590.75" y="246.75" width="294.5" height="50.5" rx="15.25" stroke="#FFFFFF" stroke-opacity="0.21" stroke-width="1.5"/>
-              <g transform="translate(608 259)" stroke="#FFFFFF" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M1 6h11.5a3.5 3.5 0 1 0-3.2-4.9"/>
-                <path d="M1 11h16a3.5 3.5 0 1 1-3.2 4.9"/>
-                <path d="M1 16h7"/>
-              </g>
-              <text x="642" y="267" fill="#FFFFFF" fill-opacity="0.7" font-size="11.5" font-weight="600">САЛХИНЫ ХУРД</text>
-              <text id="wind-speed" x="642" y="287" fill="#FFFFFF" font-size="18" font-weight="800">14 <tspan id="wind-unit" font-size="13" font-weight="600" fill-opacity="0.72">м/с</tspan></text>
-            </g>
-          </g>
-        
-          <style>
-            text {
-              font-family: Inter, "Segoe UI", Arial, sans-serif;
-              text-rendering: geometricPrecision;
-            }
-          </style>
-        </svg>
-      </section>
-    </div>
+      <section class="card site-card" id="weatherCard" aria-label="Үйлдвэрийн талбайн цаг агаар">
+        <header class="site-head">
+          <span class="chip">
+            <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            Үйлдвэрийн талбай
+            <span class="dot" aria-hidden="true"></span>
+          </span>
+        </header>
 
-    <div class="safety-bar hidden" id="safetyBlock"></div>
+        <div class="weather">
+          <svg class="sky-art" viewBox="21 6 66 59" aria-hidden="true">
+            <defs>
+              <radialGradient id="sunGlow" cx="50%" cy="50%" r="50%">
+                <stop offset="0%" stop-color="#FFD766" stop-opacity=".55"/>
+                <stop offset="100%" stop-color="#FFD766" stop-opacity="0"/>
+              </radialGradient>
+              <linearGradient id="sunBody" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stop-color="#FFE28F"/><stop offset="100%" stop-color="#FFAF3D"/>
+              </linearGradient>
+            </defs>
+            <g transform="translate(60,25)">
+              <g class="sun">
+                <circle r="17" fill="url(#sunGlow)"/>
+                <g class="rays" stroke="#FFC24D" stroke-width="2" stroke-linecap="round">
+                  <line x1="0" y1="-13" x2="0" y2="-16"/><line x1="0" y1="13" x2="0" y2="16"/>
+                  <line x1="-13" y1="0" x2="-16" y2="0"/><line x1="13" y1="0" x2="16" y2="0"/>
+                  <line x1="-9.2" y1="-9.2" x2="-11.3" y2="-11.3"/><line x1="9.2" y1="-9.2" x2="11.3" y2="-11.3"/>
+                  <line x1="-9.2" y1="9.2" x2="-11.3" y2="11.3"/><line x1="9.2" y1="9.2" x2="11.3" y2="11.3"/>
+                </g>
+                <circle r="9.5" fill="url(#sunBody)"/>
+              </g>
+            </g>
+            <g transform="translate(60,25)">
+              <g class="moon">
+                <path transform="scale(.85) translate(-12 -12)" d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" fill="#EEF3FB"/>
+                <circle class="star" cx="-13" cy="-6" r="1.2" fill="#fff"/>
+                <circle class="star star-b" cx="12" cy="-9" r="1" fill="#fff"/>
+                <circle class="star star-c" cx="10" cy="7" r="1.1" fill="#fff"/>
+              </g>
+            </g>
+            <g class="cloud-back" opacity=".45">
+              <circle cx="70" cy="44" r="7" fill="#fff"/><circle cx="79" cy="47" r="5.5" fill="#fff"/>
+              <rect x="63" y="45" width="22" height="8" rx="4" fill="#fff"/>
+            </g>
+            <g class="cloud">
+              <circle cx="32" cy="52" r="10.5" fill="#fff"/><circle cx="46" cy="46" r="13.5" fill="#fff"/>
+              <circle cx="59" cy="53" r="9.5" fill="#fff"/>
+              <rect x="24" y="50" width="44" height="13.5" rx="6.75" fill="#fff"/>
+            </g>
+          </svg>
+          <div class="temp-wrap">
+            <div class="temp-day">
+              <div class="temp-label">Өдөр</div>
+              <div class="temp"><b id="temperature">—</b><span class="unit">°C</span></div>
+            </div>
+            <div class="temp-night">
+              <div class="temp-label">Шөнө</div>
+              <div class="temp"><b id="night-temperature">—</b><span class="unit">°C</span></div>
+            </div>
+          </div>
+        </div>
+
+        <footer class="mini-stats">
+          <div class="stat">
+            <span class="ic"><svg viewBox="0 0 24 24"><path d="M12 3.3s5.7 6.4 5.7 10.2a5.7 5.7 0 1 1-11.4 0C6.3 9.7 12 3.3 12 3.3z"/></svg></span>
+            <span><i>Чийгшил</i><b id="humidity">—</b></span>
+          </div>
+          <div class="stat">
+            <span class="ic"><svg viewBox="0 0 24 24"><path d="M17.7 7.7a2.5 2.5 0 1 1 1.8 4.3H2"/><path d="M9.6 4.6A2 2 0 1 1 11 8H2"/><path d="M12.6 19.4A2 2 0 1 0 14 16H2"/></svg></span>
+            <span><i>Салхи</i><b id="wind-speed">— <small>м/с</small></b></span>
+          </div>
+        </footer>
+      </section>
+
+    </div>
 
     <div id="dashboardMessage"></div>
 

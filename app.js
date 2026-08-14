@@ -1277,7 +1277,7 @@ const PageDashboard = () => {
     txt('temperature', dash(day));
     txt('weather-condition', 'Өдрийн ээлжийн хэм');
     txt('date-text', 'ХАБЭА-гийн тайлангаас');
-    txt('night-temperature', night === null ? '—' : night + '°');
+    txt('night-temperature', night === null ? '—' : night);  // нэгжийг markup барина
     txt('humidity', hum === null ? '—' : hum + '%');
     // wind-speed доторх tspan (нэгж) хэвээр үлдэх ёстой тул зөвхөн эхний текст зангилааг солино
     const w = UI.$('#wind-speed');

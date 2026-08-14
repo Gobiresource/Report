@@ -1232,43 +1232,6 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
 }
 
 
-/* ЦАГ АГААРЫН КАРТ — ХАБЭА тайлангийн 4 утгыг харуулна.
-   Hero-гийн хажууд, дээд мөрөнд багтана. */
-.top-row{display:flex;gap:14px;align-items:stretch;margin-bottom:18px}
-.top-row > .hero{flex:1 1 auto;margin-bottom:0;min-width:0}
-/* 523px өргөн = 182px өндөр (920:320) — hero-гийн өндөртэй яг таарна.
-   Сүүдэр, хүрээ, радиус, градиент бүгд hero-той нэг хэмнэлд оруулсан. */
-.wxc-wrap{flex:0 0 523px;max-width:523px;display:flex;align-items:center}
-.wxc-wrap .wxc-svg{display:block;width:100%;height:auto;
-  filter:drop-shadow(0 16px 44px rgba(188,32,41,.35))}
-.wxc-wrap.hidden{display:none}
-@media (max-width:980px){
-  .top-row{flex-direction:column}
-  .wxc-wrap{flex:1 1 auto;max-width:none}
-  .wxc-wrap .wxc-svg{width:100%;height:auto}
-}
-
-/* --- Жижиг хөдөлгөөнүүд --- */
-.wxc-svg .wx-glow,.wxc-svg .wx-rays{transform-box:view-box;transform-origin:739px 102px}
-.wxc-svg .wx-glow{animation:wxGlow 6.5s ease-in-out infinite}
-@keyframes wxGlow{0%,100%{opacity:.7}50%{opacity:1}}
-.wxc-svg .wx-rays{animation:wxRays 120s linear infinite}
-@keyframes wxRays{to{transform:rotate(360deg)}}
-.wxc-svg .wx-clouds{transform-box:view-box;animation:wxCloud 19s ease-in-out infinite}
-@keyframes wxCloud{0%,100%{transform:translateX(0)}50%{transform:translateX(-10px)}}
-/* Ачаалах агшны богино мандалт */
-.wxc-svg .wx-pill,.wxc-svg .wx-now,.wxc-svg .wx-stats{transform-box:view-box;opacity:0;
-  animation:wxUp .5s cubic-bezier(.23,1,.32,1) forwards}
-.wxc-svg .wx-pill{animation-delay:.05s}
-.wxc-svg .wx-now{animation-delay:.14s}
-.wxc-svg .wx-stats{animation-delay:.24s}
-@keyframes wxUp{from{opacity:0;transform:translateY(9px)}to{opacity:1;transform:translateY(0)}}
-@media (prefers-reduced-motion:reduce){
-  .wxc-svg .wx-glow,.wxc-svg .wx-rays,.wxc-svg .wx-clouds{animation:none}
-  .wxc-svg .wx-pill,.wxc-svg .wx-now,.wxc-svg .wx-stats{animation:none;opacity:1;transform:none}
-}
-
-
 /* --- Hero доторх байрлал --- */
 .hero-row{flex-wrap:nowrap;align-items:center}
 .hero-main{min-width:0}
@@ -1299,3 +1262,219 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
   .safety-bar{flex-wrap:wrap}
   .safety-bar .sb-sub{margin-left:0;width:100%;text-align:left}
 }
+
+/* =========================================================================
+   V19.5 — ШИНЭ ТОЛГОЙ (2026-08-14): огнооны карт + ХАБЭА карт + дөрвөлжин
+   цаг агаар. Захиалагчийн явуулсан grd-dashboard-header.html загварыг
+   preview-ээр баталсны дараа оруулсан. Хуучин 920×320 SVG карт хасагдсан.
+   ========================================================================= */
+
+/* ===== ШИНЭ ТОЛГОЙ — захиалагчийн загвар (дөрвөлжин цаг агаар) ===== */
+.top-row{display:flex;gap:20px;align-items:stretch}
+/* Дараалал: огноо → ХАБЭА → цаг агаар (markup-д safety эхэнд байгаа ч
+   CSS order-оор дундаа орно — renderSafety-ийн код өөрчлөгдөхгүй) */
+.top-row .date-card{order:1}
+.top-row .safety-bar{order:2}
+.top-row .site-card{order:3}
+
+/* -- ХАБЭА: босоо карт (renderSafety-ийн бичдэг markup-ыг өөрчлөхгүй) --
+   АНХААР: style.css-ийн хуучин .safety-bar (хэвтээ зурвас) дүрэм мөн үйлчилж
+   байгаа тул энд БҮХ шинж чанарыг дарж бичих ёстой — тухайлбал flex-direction,
+   мөн .sb-sub-ийн margin-left:auto. */
+/* Бүтэц (grid, 3 давхар):
+     [ ОСОЛ ГЭМТЭЛГҮЙ АЖИЛЛАСАН ]   ← дээд, голлосон
+     [   (icon)   6 хоног       ]   ← дунд, голлосон, ижил өндөр
+     [ Сүүлийн тохиолдол · ...  ]   ← доод, голлосон
+   renderSafety-ийн markup-д шошго/тоо нэг div дотор тул display:contents-ээр
+   задалж grid-ийн шууд гишүүн болгоно — app.js өөрчлөгдөхгүй. */
+.top-row .safety-bar{
+  flex:0 0 auto;min-width:0;margin:0;
+  display:grid;
+  grid-template-columns:auto auto;
+  grid-template-rows:auto auto auto;
+  align-content:center;justify-content:center;
+  justify-items:center;align-items:center;
+  border-radius:26px;padding:22px 26px;
+  background:linear-gradient(160deg,#EAF7EF 0%,#DCF0E4 100%);
+  border:1px solid #C3E3CF;color:#1E6B4A;
+  box-shadow:0 22px 44px -18px rgba(30,107,74,.28);
+}
+.top-row .safety-bar > div:not(.sb-sub){display:contents}
+.top-row .safety-bar.hidden{display:none}
+.top-row .safety-bar.warn{
+  background:linear-gradient(160deg,#FDF1E2 0%,#F9E6CC 100%);
+  border-color:#EBD2A8;color:#8A5A14;
+  box-shadow:0 22px 44px -18px rgba(138,90,20,.28);
+}
+/* МӨР 1 — шошго: хоёр багана дамнан, голд */
+.top-row .safety-bar .sb-l{
+  grid-column:1 / -1;grid-row:1;
+  font-size:10px;font-weight:650;letter-spacing:.06em;text-transform:uppercase;
+  color:inherit;opacity:.72;line-height:1;white-space:nowrap;
+  margin-bottom:14px;
+}
+
+/* МӨР 2 — icon + тоо: МАШ ТОМ (64px), картын гол дүр */
+.top-row .safety-bar .sb-ico{
+  grid-column:1;grid-row:2;
+  width:64px;height:64px;flex:0 0 64px;border-radius:16px;
+  background:rgba(30,107,74,.12);display:grid;place-items:center;
+  margin-right:14px;
+}
+.top-row .safety-bar .sb-ico svg{width:34px;height:34px}
+.top-row .safety-bar.warn .sb-ico{background:rgba(138,90,20,.14)}
+
+.top-row .safety-bar .sb-v{
+  grid-column:2;grid-row:2;
+  font-size:64px;font-weight:800;letter-spacing:-.035em;line-height:1;
+  font-variant-numeric:tabular-nums;
+}
+.top-row .safety-bar .sb-v small{
+  font-size:15px;font-weight:600;margin-left:7px;letter-spacing:0;
+  color:inherit;opacity:.75;
+}
+
+/* МӨР 3 — огноо: зураасаар салгаж, голд */
+.top-row .safety-bar .sb-sub{
+  grid-column:1 / -1;grid-row:3;justify-self:stretch;
+  margin:16px 0 0;padding:12px 0 0;text-align:center;
+  border-top:1px solid rgba(30,107,74,.16);
+  font-size:10.5px;font-weight:500;color:inherit;opacity:.6;line-height:1;
+  white-space:nowrap;
+}
+.top-row .safety-bar.warn .sb-sub{border-top-color:rgba(138,90,20,.18)}
+
+/* АНХААР: .card нь style.css-д KPI картуудад аль хэдийн ашиглагдаж байгаа.
+   Хамрах хүрээг .top-row-оор хязгаарлаагүй бол бүх KPI карт улаан болно. */
+.top-row .card{
+  position:relative;overflow:hidden;border-radius:26px;
+  background:linear-gradient(140deg,#D22633 0%,#BC2029 45%,#7C0E19 100%);
+  box-shadow:0 22px 44px -18px rgba(124,14,25,.55), inset 0 1px 0 rgba(255,255,255,.25);
+  color:#fff;
+}
+.top-row .card::before{
+  content:"";position:absolute;inset:0;pointer-events:none;
+  background:
+    radial-gradient(120% 95% at 88% -12%, rgba(255,255,255,.22), transparent 55%),
+    radial-gradient(95% 75% at -12% 112%, rgba(0,0,0,.28), transparent 60%);
+}
+.top-row .card>*{position:relative}
+
+/* -- Огнооны карт -- */
+.date-card{
+  flex:1 1 auto;min-width:0;padding:26px 28px;
+  display:flex;flex-direction:column;justify-content:space-between;gap:28px;
+}
+.date-card h2{
+  margin:0;font-size:29px;font-weight:800;line-height:1.22;color:#fff;
+  letter-spacing:-.4px;text-wrap:balance;font-variant-numeric:tabular-nums;
+}
+.date-card .subtitle{margin:8px 0 0;font-size:14px;font-weight:500;color:rgba(255,255,255,.78)}
+.date-controls{display:flex;align-items:center;gap:10px}
+.date-controls .nav{
+  width:42px;height:42px;flex:none;border-radius:50%;
+  display:grid;place-items:center;cursor:pointer;
+  color:#fff;background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);
+  transition:background .18s cubic-bezier(.23,1,.32,1),transform .12s cubic-bezier(.23,1,.32,1);
+}
+.date-controls .nav:hover{background:rgba(255,255,255,.19)}
+.date-controls .nav:active{transform:scale(.94)}
+.date-controls .nav svg{width:16px;height:16px;fill:none;stroke:currentColor;
+  stroke-width:2.2;stroke-linecap:round;stroke-linejoin:round}
+.date-controls input[type="date"]{
+  color-scheme:dark;font-family:inherit;font-size:14px;font-weight:600;color:#fff;
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);
+  border-radius:13px;padding:11px 14px;outline:none;
+}
+.date-controls .nav:focus-visible,.date-controls input:focus-visible{
+  outline:2px solid rgba(255,255,255,.75);outline-offset:2px}
+
+/* -- Цаг агаар: ДӨРВӨЛЖИН -- */
+.site-card{
+  flex:0 0 auto;align-self:stretch;aspect-ratio:1 / 1;padding:14px 15px;
+  display:flex;flex-direction:column;justify-content:space-between;gap:8px;
+}
+.site-card.hidden{display:none}
+.site-head{display:flex;justify-content:flex-start}
+.site-card .chip{
+  display:inline-flex;align-items:center;gap:6px;padding:5px 10px;border-radius:999px;
+  background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.22);
+  font-size:11px;font-weight:600;letter-spacing:.2px;white-space:nowrap;color:#fff;
+}
+.site-card .chip svg{width:11px;height:11px;fill:none;stroke:currentColor;
+  stroke-width:2;stroke-linecap:round;stroke-linejoin:round;opacity:.9}
+.site-card .chip .dot{width:6px;height:6px;border-radius:50%;background:#4ADE80;
+  animation:wxpulse 2.4s cubic-bezier(.23,1,.32,1) infinite}
+@keyframes wxpulse{
+  0%{box-shadow:0 0 0 0 rgba(74,222,128,.55)}
+  70%,100%{box-shadow:0 0 0 7px rgba(74,222,128,0)}
+}
+
+.weather{flex:1;display:flex;align-items:center;gap:8px;min-width:0;min-height:0}
+.sky-art{width:86px;height:auto;max-height:100%;flex:none}
+
+.temp-wrap{position:relative;flex:1;min-width:0}
+.temp-day,.temp-night{display:flex;flex-direction:column-reverse;align-items:flex-start}
+.temp-label{font-size:10px;font-weight:700;letter-spacing:1.1px;text-transform:uppercase;
+  color:rgba(255,255,255,.56);margin-top:3px;white-space:nowrap}
+.temp{
+  display:flex;align-items:flex-start;gap:2px;
+  font-size:38px;font-weight:800;line-height:1;letter-spacing:-1.4px;
+  font-variant-numeric:tabular-nums;white-space:nowrap;color:#fff;
+}
+.temp b{font-weight:800}
+.temp .unit{font-size:16px;font-weight:700;letter-spacing:0;margin-top:4px;color:rgba(255,255,255,.78)}
+
+.temp-day{animation:tempswap 8s ease-in-out infinite}
+.temp-night{position:absolute;top:0;left:0;opacity:0;animation:tempswap 8s ease-in-out -4s infinite}
+@keyframes tempswap{
+  0%,42%{opacity:1;transform:translateY(0)}
+  50%,92%{opacity:0;transform:translateY(6px)}
+  100%{opacity:1;transform:translateY(0)}
+}
+.sun{animation:riseset 8s ease-in-out infinite}
+.moon{opacity:0;animation:riseset 8s ease-in-out -4s infinite}
+@keyframes riseset{
+  0%,42%{transform:translateY(0);opacity:1}
+  50%,92%{transform:translateY(24px);opacity:0}
+  100%{transform:translateY(0);opacity:1}
+}
+.rays{transform-box:fill-box;transform-origin:center;animation:wxspin 20s linear infinite}
+@keyframes wxspin{to{transform:rotate(360deg)}}
+.star{animation:twinkle 2.6s ease-in-out infinite alternate}
+.star-b{animation-delay:.9s}
+.star-c{animation-delay:1.7s}
+@keyframes twinkle{from{opacity:.25}to{opacity:1}}
+.cloud{animation:drift 6s ease-in-out infinite}
+.cloud-back{animation:drift 8.5s ease-in-out -3s infinite}
+@keyframes drift{0%,100%{transform:translate(0,0)}50%{transform:translate(4px,-3px)}}
+
+.mini-stats{display:flex;flex-direction:column;gap:6px}
+.mini-stats .stat{
+  display:flex;align-items:center;gap:8px;min-width:0;padding:6px 10px;border-radius:11px;
+  background:rgba(255,255,255,.10);border:1px solid rgba(255,255,255,.16);
+}
+/* :not(.ic) ЗААВАЛ — эс бөгөөс доорх дүрэм icon-ы хайрцагт бас таарч,
+   түүнд flex:1 өгснөөр дүрсний дөрвөлжин өргөсөж шошгыг баруун тийш түлхдэг. */
+.mini-stats .stat > span:not(.ic){display:flex;align-items:center;gap:8px;flex:1;min-width:0}
+.mini-stats .stat > span.ic{
+  width:20px;height:20px;flex:0 0 20px;border-radius:4px;
+  background:rgba(255,255,255,.15);display:grid;place-items:center}
+.mini-stats .ic svg{width:11px;height:11px;fill:none;stroke:#fff;stroke-width:2;
+  stroke-linecap:round;stroke-linejoin:round;opacity:.92}
+.mini-stats i{font-style:normal;font-size:9px;font-weight:700;letter-spacing:.8px;
+  text-transform:uppercase;color:rgba(255,255,255,.56);white-space:nowrap}
+.mini-stats b{margin-left:auto;font-size:13px;font-weight:700;color:#fff;
+  font-variant-numeric:tabular-nums;white-space:nowrap}
+.mini-stats b small{font-size:10px;font-weight:600;color:rgba(255,255,255,.72)}
+
+@media(max-width:1040px){
+  .top-row{flex-direction:column}
+  .site-card{aspect-ratio:auto;align-self:auto}
+  .date-card h2{font-size:25px}
+}
+@media(prefers-reduced-motion:reduce){
+  .site-card .chip .dot,.sun,.moon,.rays,.star,.cloud,.cloud-back,.temp-day,.temp-night{animation:none}
+  .moon,.temp-night{display:none}
+}
+

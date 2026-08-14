@@ -6,6 +6,8 @@ node_modules/
 # Дизайны туршилт, mockup, урьдчилан харах файлууд (эх код биш)
 _mockup_*.html
 _preview_*.html
+_build_*_preview.cjs
+_apply_weather_header.cjs
 _dashboard_live_preview.html
 _gauge_demo.html
 _donut_fit_test.html
