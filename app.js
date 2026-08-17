@@ -312,7 +312,9 @@ const API = (() => {
     myTasks: () => call('/api/tasks/mine', withAuth({})),
     taskStatus: (task_id, status, worker_note) => call('/api/tasks/status', withAuth({task_id, status, worker_note})),
     range: (from, to) => call('/api/range', withAuth({from, to})),
-    planSave: (month, plan) => call('/api/plan/save', withAuth({month, plan}))
+    planSave: (month, plan) => call('/api/plan/save', withAuth({month, plan})),
+    summary: (from, to, force) => call('/api/summary', withAuth({from, to, force: !!force})),
+    ask: (question, date) => call('/api/ask', withAuth({question, date}))
   };
 })();
 
@@ -1209,6 +1211,7 @@ const PageDashboard = () => {
       renderWeather(dailyMap.hse);
       renderSafety(periodTo);
       renderPeriodExtras(cur);
+      loadAiSummary(periodFrom, periodTo);
     }catch(err){
       if(/нэвтрэлт|эрхгүй/i.test(err.message)){ SESSION.clear(); location.href = 'index.html'; return; }
       UI.$('#summaryCards').innerHTML = '';
@@ -1216,6 +1219,75 @@ const PageDashboard = () => {
     }
   }
   const loadDaily = () => setPeriod(periodKind);   // хуучин дуудлагатай нийцүүлэх
+
+  /* ---------------- AI нэгтгэл ----------------
+     Кэштэй нэгтгэлийг хүн бүр харна; ҮҮСГЭХ (төлбөртэй дуудлага) нь зөвхөн
+     admin. stale = тайлан нэмэгдсэнээс хойш шинэчлээгүй гэсэн дохио. */
+  let aiReq = 0;
+  async function loadAiSummary(from, to){
+    const panel = UI.$('#aiPanel');
+    if(!panel) return;
+    const body = UI.$('#aiBody'), btn = UI.$('#aiBtn'), sub = UI.$('#aiSub');
+    const isAdmin = (SESSION.get() || {}).role === 'admin';
+    const my = ++aiReq;                       // огноо солигдоход хуучин хариуг хаях
+
+    const render = (res) => {
+      if(my !== aiReq) return;
+      panel.classList.remove('hidden');
+      btn.classList.toggle('hidden', !isAdmin);
+      if(res.summary){
+        body.innerHTML = '<div class="ai-text">' + aiHtml(res.summary) + '</div>';
+        sub.textContent = (res.stale ? 'Тайлан шинэчлэгдсэн — нэгтгэл хуучирсан. ' : '')
+          + (res.created_at ? 'Үүсгэсэн: ' + String(res.created_at).slice(0,16).replace('T',' ') : '');
+        btn.textContent = res.stale ? 'Дахин үүсгэх' : 'Шинэчлэх';
+      } else {
+        body.innerHTML = '<div class="module-empty">'
+          + (res.reason || (isAdmin ? 'Нэгтгэл үүсгээгүй байна.' : 'Нэгтгэл үүсгээгүй байна (админ үүсгэнэ).'))
+          + '</div>';
+        sub.textContent = 'Өдрийн тайлангаас үүсгэсэн товч дүгнэлт.';
+        btn.textContent = 'Нэгтгэл үүсгэх';
+      }
+    };
+
+    try{ render(await API.summary(from, to, false)); }
+    catch(e){ panel.classList.add('hidden'); return; }   // түлхүүр тохируулаагүй үед панел гарахгүй
+
+    /* --- Асуулт: нэвтэрсэн хэн ч асууна. Контекст нь тухайн сар. --- */
+    const form = UI.$('#aiAskForm'), qIn = UI.$('#aiQ'),
+          askBtn = UI.$('#aiAskBtn'), ansBox = UI.$('#aiAnswer');
+    if(form && !form.dataset.bound){
+      form.dataset.bound = '1';
+      form.addEventListener('submit', async (ev) => {
+        ev.preventDefault();
+        const q = qIn.value.trim();
+        if(!q) return;
+        askBtn.disabled = true; askBtn.textContent = 'Хариулж байна…';
+        ansBox.innerHTML = '<div class="module-empty">AI бодож байна…</div>';
+        try{
+          const res = await API.ask(q, UI.$('#dashboardDate').value || UI.today());
+          ansBox.innerHTML = '<div class="ai-answer"><div class="ai-q">' + UI.esc(q) + '</div>'
+            + '<div class="ai-text">' + aiHtml(res.answer) + '</div></div>';
+          qIn.value = '';
+        }catch(e){
+          ansBox.innerHTML = '<div class="module-empty">' + UI.esc(e.message) + '</div>';
+        }
+        askBtn.disabled = false; askBtn.textContent = 'Асуух';
+      });
+    }
+
+    btn.onclick = async () => {
+      btn.disabled = true; btn.textContent = 'Үүсгэж байна…';
+      try{ render(await API.summary(from, to, true)); }
+      catch(e){ UI.$('#aiBody').innerHTML = '<div class="module-empty">' + UI.esc(e.message) + '</div>'; }
+      btn.disabled = false;
+    };
+  }
+  /* **гарчиг:** хэлбэрийг тод болгож, мөр таслалыг хадгална */
+  function aiHtml(text){
+    return UI.esc(text)
+      .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
+      .replace(/\n+/g, '<br>');
+  }
 
   /* ---------------- Осол гэмтэлгүй ажилласан хоног ----------------
      Сүүлийн 45 хоногийн ХАБЭА тайлангаас зөрчил/эмнэлгийн тусламж бүртгэгдсэн

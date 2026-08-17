@@ -1478,3 +1478,18 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
   .moon,.temp-night{display:none}
 }
 
+
+/* =========================================================================
+   AI НЭГТГЭЛ (2026-08-17) — самбарын өдрийн дүгнэлтийн панел
+   ========================================================================= */
+.ai-text{font-size:14px;line-height:1.65;color:var(--ink);max-width:80ch}
+.ai-text b{font-weight:700;color:var(--ink)}
+.ai-ask{display:flex;gap:10px;margin-top:16px}
+.ai-ask input{
+  flex:1;min-width:0;border:1px solid rgba(60,60,80,.16);border-radius:12px;
+  padding:11px 14px;font:500 13.5px/1.4 var(--font);color:var(--ink);
+  background:#FAFBFA;outline:none;
+}
+.ai-ask input:focus{border-color:var(--brand);background:#fff}
+.ai-answer{margin-top:14px;background:#FAFBFA;border-radius:14px;padding:14px 16px}
+.ai-answer .ai-q{font-size:12.5px;font-weight:700;color:var(--ink-2);margin-bottom:8px}

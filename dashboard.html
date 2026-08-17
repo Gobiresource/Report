@@ -125,7 +125,7 @@
         </footer>
       </section>
 
-    </div>
+    </div>
 
     <div id="dashboardMessage"></div>
 
@@ -142,6 +142,20 @@
         <div><h3>Гол үзүүлэлтүүд</h3><p>Сонгосон өдрийн нэгтгэл дүн.</p></div>
       </div>
       <div id="summaryCards" class="cards"></div>
+    </section>
+
+    <section class="bezel panel hidden" id="aiPanel"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head">
+        <div><h3>AI нэгтгэл</h3><p id="aiSub">Өдрийн тайлангаас үүсгэсэн товч дүгнэлт.</p></div>
+        <button class="btn btn-soft hidden" id="aiBtn">Нэгтгэл үүсгэх</button>
+      </div>
+      <div id="aiBody"></div>
+      <form id="aiAskForm" class="ai-ask">
+        <input id="aiQ" type="text" maxlength="300"
+               placeholder="Тайлангийн талаар асуух… (ж: энэ сард хамгийн бага үйлдвэрлэлтэй өдөр аль вэ?)">
+        <button type="submit" class="btn btn-primary" id="aiAskBtn">Асуух</button>
+      </form>
+      <div id="aiAnswer"></div>
     </section>
 
 
