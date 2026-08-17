@@ -188,6 +188,19 @@ migration хэрэггүй.
 баталсан. ЗӨВШӨӨРӨЛГҮЙГЭЭР буцааж оруулж болохгүй.** Эргүүлж оруулах бол dashboard.html-д
 #planArea, #monthlyCards, #monthlyMachines гэсэн гурван id-тай элемент нэмэхэд хангалттай.
 
+## PWA (2026-08-17 нэмсэн)
+- `manifest.json` + icon-192/512(.png, -maskable) + apple-touch-icon.png.
+  5 HTML-ийн `<head>`-д manifest/theme-color/apple-touch-icon гурван мөр бий —
+  **шинэ HTML нэмбэл эдгээрийг бас хуулна.**
+- Утаснаас: Chrome → цэс → «Add to Home Screen» / Safari → Share →
+  «Нүүр дэлгэцэд нэмэх» — апп шиг icon үүсч, standalone горимд нээгдэнэ.
+- **Service worker ЗОРИУД ХИЙГЭЭГҮЙ** — offline cache нь хуучин CSS/JS-ийг
+  барьж «өөрчлөлт харагдахгүй байна» асуудлыг дахин үүсгэх эрсдэлтэй.
+  Одоо суулгах боломж (installability)-д SW шаардлагагүй.
+- maskable icon = улаан дэвсгэр дээр логог 80% болгосон хувилбар (Android
+  дугуй таглалтад захаас тасрахгүй).
+- deploy.ps1 эдгээр 6 файлыг dist-д хуулдаг — жагсаалтаас бүү хас.
+
 ## Файлын бүтэц
 - index.html / dashboard.html / report.html / admin.html / meeting.html
 - app.js — CONFIG (тайлангийн төрөл, form, KPI) / SESSION / API / UI
