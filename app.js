@@ -1252,28 +1252,7 @@ const PageDashboard = () => {
     try{ render(await API.summary(from, to, false)); }
     catch(e){ panel.classList.add('hidden'); return; }   // түлхүүр тохируулаагүй үед панел гарахгүй
 
-    /* --- Асуулт: нэвтэрсэн хэн ч асууна. Контекст нь тухайн сар. --- */
-    const form = UI.$('#aiAskForm'), qIn = UI.$('#aiQ'),
-          askBtn = UI.$('#aiAskBtn'), ansBox = UI.$('#aiAnswer');
-    if(form && !form.dataset.bound){
-      form.dataset.bound = '1';
-      form.addEventListener('submit', async (ev) => {
-        ev.preventDefault();
-        const q = qIn.value.trim();
-        if(!q) return;
-        askBtn.disabled = true; askBtn.textContent = 'Хариулж байна…';
-        ansBox.innerHTML = '<div class="module-empty">AI бодож байна…</div>';
-        try{
-          const res = await API.ask(q, UI.$('#dashboardDate').value || UI.today());
-          ansBox.innerHTML = '<div class="ai-answer"><div class="ai-q">' + UI.esc(q) + '</div>'
-            + '<div class="ai-text">' + aiHtml(res.answer) + '</div></div>';
-          qIn.value = '';
-        }catch(e){
-          ansBox.innerHTML = '<div class="module-empty">' + UI.esc(e.message) + '</div>';
-        }
-        askBtn.disabled = false; askBtn.textContent = 'Асуух';
-      });
-    }
+    initAiChat();   // summary амжилттай = AI идэвхтэй → чатын товчийг гаргана
 
     btn.onclick = async () => {
       btn.disabled = true; btn.textContent = 'Үүсгэж байна…';
@@ -1287,6 +1266,66 @@ const PageDashboard = () => {
     return UI.esc(text)
       .replace(/\*\*(.+?)\*\*/g, '<b>$1</b>')
       .replace(/\n+/g, '<br>');
+  }
+
+  /* ---------------- AI туслах — хөвөгч чат ----------------
+     Асуулт баруун (улаан), хариу зүүн (саарал) бөмбөлгөөр давхарлана.
+     Түүх sessionStorage-д — хуудас сэргээхэд хадгалагдана, гарахад арилна.
+     Асуулт бүр backend-д тусдаа очно (өмнөх яриаг AI санахгүй) —
+     контекст нь тухайн сарын тайлан тул ихэнх асуултад хангалттай. */
+  function initAiChat(){
+    const fab = UI.$('#aiFab'), box = UI.$('#aiChat');
+    if(!fab || !box || fab.dataset.bound) return;
+    fab.dataset.bound = '1';
+
+    const log = UI.$('#aiChatLog'), form = UI.$('#aiChatForm'),
+          input = UI.$('#aiChatQ'), send = UI.$('#aiChatSend');
+    const KEY = 'grd_ai_chat';
+
+    fab.classList.remove('hidden');
+    fab.addEventListener('click', () => {
+      box.classList.toggle('hidden');
+      if(!box.classList.contains('hidden')) input.focus();
+    });
+    UI.$('#aiChatClose').addEventListener('click', () => box.classList.add('hidden'));
+
+    const bubble = (cls, html) => {
+      const el = document.createElement('div');
+      el.className = 'ai-msg ' + cls;
+      el.innerHTML = html;
+      log.appendChild(el);
+      log.scrollTop = log.scrollHeight;
+      return el;
+    };
+
+    /* Өмнөх яриаг сэргээх */
+    let hist = [];
+    try{ hist = JSON.parse(sessionStorage.getItem(KEY) || '[]'); }catch(e){}
+    for(const m of hist) bubble(m.role === 'user' ? 'me' : 'bot', aiHtml(m.text));
+
+    form.addEventListener('submit', async (ev) => {
+      ev.preventDefault();
+      const q = input.value.trim();
+      if(!q || send.disabled) return;
+      input.value = '';
+      send.disabled = true;
+      bubble('me', UI.esc(q));
+      hist.push({role:'user', text:q});
+      const typing = bubble('bot typing', '<i></i><i></i><i></i>');
+      try{
+        const res = await API.ask(q, UI.$('#dashboardDate').value || UI.today());
+        typing.remove();
+        bubble('bot', aiHtml(res.answer));
+        hist.push({role:'bot', text:res.answer});
+      }catch(e){
+        typing.remove();
+        bubble('bot err', UI.esc(e.message));
+      }
+      hist = hist.slice(-30);
+      try{ sessionStorage.setItem(KEY, JSON.stringify(hist)); }catch(e){}
+      send.disabled = false;
+      input.focus();
+    });
   }
 
   /* ---------------- Осол гэмтэлгүй ажилласан хоног ----------------

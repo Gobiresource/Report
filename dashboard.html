@@ -150,12 +150,6 @@
         <button class="btn btn-soft hidden" id="aiBtn">Нэгтгэл үүсгэх</button>
       </div>
       <div id="aiBody"></div>
-      <form id="aiAskForm" class="ai-ask">
-        <input id="aiQ" type="text" maxlength="300"
-               placeholder="Тайлангийн талаар асуух… (ж: энэ сард хамгийн бага үйлдвэрлэлтэй өдөр аль вэ?)">
-        <button type="submit" class="btn btn-primary" id="aiAskBtn">Асуух</button>
-      </form>
-      <div id="aiAnswer"></div>
     </section>
 
 
@@ -169,6 +163,36 @@
          Эргүүлж оруулах бол дээрх гурван id-тай элементийг нэмэхэд хангалттай. -->
 
   </main>
+
+  <!-- AI туслах — хөвөгч чат -->
+  <button id="aiFab" class="ai-fab hidden" type="button" aria-label="AI туслахаас асуух">
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+         stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M21 12c0 4.1-4 7.4-9 7.4-1 0-2-.13-2.9-.38L4 21l1.6-3.6C4 16.1 3 14.2 3 12c0-4.1 4-7.4 9-7.4s9 3.3 9 7.4z"/>
+      <path d="M12 8.6l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" fill="currentColor" stroke="none"/>
+    </svg>
+  </button>
+  <div id="aiChat" class="ai-chat hidden" role="dialog" aria-label="AI туслах">
+    <div class="ai-chat-head">
+      <span class="ai-chat-title">AI туслах</span>
+      <span class="ai-chat-sub">зөвхөн тайлангийн өгөгдлөөс</span>
+      <button id="aiChatClose" type="button" aria-label="Хаах">✕</button>
+    </div>
+    <div id="aiChatLog" class="ai-chat-log">
+      <div class="ai-msg bot">Сайн байна уу! Тайлангийн талаар асуугаарай.
+        Жишээ: «Энэ сард хамгийн бага үйлдвэрлэлтэй өдөр аль вэ?»</div>
+    </div>
+    <form id="aiChatForm" class="ai-chat-form">
+      <input id="aiChatQ" type="text" maxlength="300" placeholder="Асуултаа бичнэ үү…" autocomplete="off">
+      <button type="submit" id="aiChatSend" aria-label="Илгээх">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/>
+        </svg>
+      </button>
+    </form>
+  </div>
+
   <script src="app.js"></script>
 </body>
 </html>
