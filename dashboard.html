@@ -174,20 +174,44 @@
   </button>
   <div id="aiChat" class="ai-chat hidden" role="dialog" aria-label="AI туслах">
     <div class="ai-chat-head">
-      <span class="ai-chat-title">AI туслах</span>
-      <span class="ai-chat-sub">зөвхөн тайлангийн өгөгдлөөс</span>
-      <button id="aiChatClose" type="button" aria-label="Хаах">✕</button>
+      <span class="ai-ava">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M12 3l1.7 4.3L18 9l-4.3 1.7L12 15l-1.7-4.3L6 9l4.3-1.7z" fill="currentColor" stroke="none"/>
+          <path d="M18.5 15l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8z" fill="currentColor" stroke="none"/>
+        </svg>
+      </span>
+      <span class="ai-chat-titles">
+        <span class="ai-chat-title">AI туслах</span>
+        <span class="ai-chat-sub"><i class="ai-dot"></i>Зөвхөн тайлангийн өгөгдлөөс</span>
+      </span>
+      <button id="aiChatClear" type="button" aria-label="Яриа цэвэрлэх" title="Яриа цэвэрлэх">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14M10 11v6M14 11v6"/></svg>
+      </button>
+      <button id="aiChatClose" type="button" aria-label="Хаах">
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+             stroke-width="2.4" stroke-linecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+      </button>
     </div>
     <div id="aiChatLog" class="ai-chat-log">
-      <div class="ai-msg bot">Сайн байна уу! Тайлангийн талаар асуугаарай.
-        Жишээ: «Энэ сард хамгийн бага үйлдвэрлэлтэй өдөр аль вэ?»</div>
+      <div class="ai-hello" id="aiHello">
+        <div class="ai-hello-t">Тайлангийн талаар асуугаарай</div>
+        <div class="ai-hello-s">Сонгосон сарын бүх тайлангаас хариулна</div>
+        <div class="ai-sugg">
+          <button type="button" class="ai-chip">Энэ сард нийт хэдэн тонн үйлдвэрлэсэн бэ?</button>
+          <button type="button" class="ai-chip">Хамгийн олон асуудалтай өдөр аль вэ?</button>
+          <button type="button" class="ai-chip">Түлшний зарлага дунджаар хэд вэ?</button>
+        </div>
+      </div>
     </div>
     <form id="aiChatForm" class="ai-chat-form">
       <input id="aiChatQ" type="text" maxlength="300" placeholder="Асуултаа бичнэ үү…" autocomplete="off">
-      <button type="submit" id="aiChatSend" aria-label="Илгээх">
-        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      <button type="submit" id="aiChatSend" disabled aria-label="Илгээх">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor"
              stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M22 2 11 13M22 2l-7 20-4-9-9-4z"/>
+          <path d="M12 19V5M5 12l7-7 7 7"/>
         </svg>
       </button>
     </form>

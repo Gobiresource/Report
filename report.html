@@ -71,23 +71,13 @@
 
     <section id="vehiclePanel" class="bezel panel hidden"><span class="tick-a"></span><span class="tick-b"></span>
       <div class="panel-head">
-        <div><h3>Машины бүртгэл</h3><p>Тээвэр, түлшний тайланд ашиглагдах машинуудын жагсаалт. Нэмэх, хасах эрх нь тээврийн ажилтан болон админд бий.</p></div>
+        <div><h3>Машины бүртгэл</h3><p>Ангилал (компани) + марк + дугаар. Компани зөвхөн энд харагдана — тайлангийн хэсгүүдэд гарахгүй. Нэмэх, хасах эрх нь тээвэр/техникийн ажилтан болон админд бий.</p></div>
       </div>
       <div id="vehicleList"></div>
       <form id="vehicleAddForm" class="vehicle-add">
-        <input id="vNewName" type="text" placeholder="Машины дугаар / нэр" required>
-        <select id="vNewPurpose">
-          <option value="sludge">Шлам</option>
-          <option value="waste">Хаягдал</option>
-          <option value="short">Богино рейс</option>
-          <option value="product">Бүтээгдэхүүн</option>
-          <option value="support" selected>Туслах</option>
-        </select>
-        <select id="vNewOwnership">
-          <option value="own" selected>Өөрийн</option>
-          <option value="rental_product">Бүт. түрээс</option>
-          <option value="rental_sludge">Шлам түрээс</option>
-        </select>
+        <select id="vNewCompany"></select>
+        <select id="vNewBrand"></select>
+        <input id="vNewName" type="text" placeholder="Дугаар (ж: 0125 УБА)" required>
         <button type="submit" class="btn btn-primary">+ Нэмэх</button>
       </form>
     </section>
