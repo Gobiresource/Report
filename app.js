@@ -104,9 +104,9 @@ const CONFIG = (() => {
       {name:'note', label:'Тайлбар', type:'textarea', full:true},
       ...ISSUE_FIELDS
     ],
+    /* 2026-08: ШТС + Заправщик хоёр агуулах — buildFuelForm өөрөө агуулахын
+       картуудыг угсарна. Энд зөвхөн сүүлчийн (tail) талбарууд үлдэнэ. */
     fuel: [
-      {name:'fuel_opening_liter', label:'Эхний үлдэгдэл / л (өмнөх өдрөөс автоматаар)', type:'number'},
-      {name:'fuel_income_liter',  label:'Орлого / л (татан авалт)', type:'number'},
       {name:'note', label:'Тайлбар', type:'textarea', full:true},
       ...ISSUE_FIELDS
     ],
@@ -841,6 +841,10 @@ const Aggregate = (() => {
     fuel: {
       fuel_opening_liter:FIRST, fuel_income_liter:SUM,
       fuel_expense_liter:SUM, fuel_closing_liter:LAST,
+      /* 2026-08: ШТС/Заправщик хоёр агуулах */
+      shts_opening:FIRST, shts_income:SUM, shts_expense:SUM, shts_closing:LAST,
+      zapr_opening:FIRST, zapr_income:SUM, zapr_from_shts:SUM,
+      zapr_expense:SUM, zapr_closing:LAST,
       fuel_truck_income_liter:SUM, fuel_truck_machine_liter:SUM,
       fuel_truck_plant_liter:SUM, reserve_tank_expense_liter:SUM,
       fuel_truck_closing_liter:LAST, reserve_tank_closing_liter:LAST
@@ -1671,21 +1675,41 @@ const PageDashboard = () => {
       ? `<div class="viz-block"><div class="viz-title">Түлш зарцуулалт — машинаар</div>${UI.barListHtml(barItems, 'л')}</div>`
       : '';
 
+    /* 2026-08: шинэ мөрөнд src (ШТС/Заправщик) + full байна; хуучин мөрөнд
+       ownership/moto/remain — хоёуланг нь дэмжинэ */
+    const srcBadge = src => src
+      ? `<span class="own-badge" style="background:${src==='shts'?'#3D4A63':'#1F8FA3'}">${src==='shts'?'ШТС':'Запр.'}</span>`
+      : '';
+    const isNew = sorted.some(row => row.src);
     const rows = sorted.map(row => {
         const t = trnByVid[row.vid];
         const trips = t ? n(t.trips) : null;
         const ton = t ? n(t.ton) : null;
         const lpt = (ton && n(row.liter)) ? (n(row.liter)/ton) : null;
+        const midCells = isNew
+          ? `<td class="right">${row.full ? '✓ Дүүргэсэн' : '—'}</td>`
+          : `<td class="right">${row.moto ? UI.fmt(n(row.moto)) : '—'}</td>
+             <td class="right">${row.remain !== '' && row.remain != null ? UI.fmt(n(row.remain)) : '—'}</td>`;
         return `<tr>
-          <td>${UI.esc(row.name || '—')} ${ownBadge(row.ownership)}</td>
+          <td>${UI.esc(row.name || '—')} ${row.src ? srcBadge(row.src) : ownBadge(row.ownership)}</td>
           <td class="right">${UI.fmt(n(row.liter))}</td>
-          <td class="right">${row.moto ? UI.fmt(n(row.moto)) : '—'}</td>
-          <td class="right">${row.remain !== '' && row.remain != null ? UI.fmt(n(row.remain)) : '—'}</td>
+          ${midCells}
           <td class="right">${trips !== null ? UI.fmt(trips) : '—'}</td>
           <td class="right">${ton !== null ? UI.fmt(ton) : '—'}</td>
           <td class="right"><b>${lpt !== null ? lpt.toFixed(2) : '—'}</b></td>
         </tr>`;
       }).join('');
+    const headCells = isNew
+      ? '<th>Банк</th>'
+      : '<th>Мото цаг</th><th>Машинд үлдсэн / л</th>';
+
+    /* Агуулах тус бүрийн задаргаа (шинэ тайланд л бий) */
+    const tanksBlock = (d.shts_closing !== undefined && d.shts_closing !== null)
+      ? `<div class="fuel-calc detail-chips">
+          <span>ШТС: орлого <b>${UI.fmt(n(d.shts_income))}</b> · зарлага <b>${UI.fmt(n(d.shts_expense))}</b> · үлд <b>${UI.fmt(n(d.shts_closing))} л</b></span>
+          <span>Заправщик: орлого <b>${UI.fmt(n(d.zapr_income))}</b> · ШТС-ээс <b>${UI.fmt(n(d.zapr_from_shts))}</b> · зарлага <b>${UI.fmt(n(d.zapr_expense))}</b> · үлд <b>${UI.fmt(n(d.zapr_closing))} л</b></span>
+        </div>`
+      : '';
 
     return `
       <div class="fuel-calc detail-chips ${neg?'fuel-neg':''}">
@@ -1695,9 +1719,10 @@ const PageDashboard = () => {
         <span>Үлдэгдэл: <b>${UI.fmt(closing)} л</b></span>
         ${neg ? '<span class="fuel-warn-txt">⚠ Сөрөг үлдэгдэл</span>' : ''}
       </div>
+      ${tanksBlock}
       ${barsBlock}
       <div class="table-wrap"><table class="table">
-        <thead><tr><th>Машин</th><th>Олгосон / л</th><th>Мото цаг</th><th>Машинд үлдсэн / л</th><th>Рейс</th><th>Тонн</th><th>л/тонн</th></tr></thead>
+        <thead><tr><th>Машин</th><th>Олгосон / л</th>${headCells}<th>Рейс</th><th>Тонн</th><th>л/тонн</th></tr></thead>
         <tbody>${rows || '<tr><td colspan="7" class="muted">Машины мөр байхгүй</td></tr>'}</tbody>
       </table></div>
       ${d.note ? `<p class="muted" style="margin:12px 2px 0;font-size:13px">Тайлбар: ${UI.esc(d.note)}</p>` : ''}
@@ -2283,87 +2308,145 @@ const PageReport = () => {
     }));
   }
 
-  /* ---------------- Түлшний тусгай form (3 баганаар) ---------------- */
+  /* ---------------- Түлшний form: ШТС + Заправщик (2026-08) ----------------
+     Хоёр агуулах тус бүр өөрийн балансатай. Заправщик ШТС-ээс дүүргэвэл
+     дотоод шилжүүлэг (нийт өөрчлөгдөхгүй). Олголтын мөр бүрд эх үүсвэр
+     сонгоно; машин эх үүсвэрээ санана. «Банк дүүргэсэн ✓» = бүтэн
+     дүүргэлтийн аргын цэг — хоёр дүүргэлтийн хоорондох хэрэглээг дараа
+     нарийн тооцох суурь. Мото цаг, «үлдсэн» багана хасагдсан. */
+  const LAST_SRC = {};       /* машин бүрийн сүүлд сонгосон эх үүсвэр */
+
   function buildFuelForm(form, fields){
     if(!VEHICLES.length){
       form.innerHTML = '<div class="module-empty">Машины бүртгэл ачаалж байна… Хэрэв удаж байвал хуудсаа сэргээнэ үү.</div>';
       return;
     }
-    /* 2026-08: өмчлөлийн бүлэглэл хасагдсан — нэг жагсаалт, марк · дугаараар */
-    const rows = VEHICLES.map(v => `<div class="mrow fuel" data-vid="${v.id}">
+    const rows = VEHICLES.map(v => `<div class="mrow fuel4" data-vid="${v.id}">
         <span class="mrow-name">${UI.esc(vLabel(v))}</span>
-        <input class="f-liter" type="number" step="any" min="0" placeholder="олгосон л">
-        <input class="f-moto" type="number" step="any" min="0" placeholder="мото">
-        <input class="f-remain" type="number" step="any" min="0" placeholder="үлдсэн л">
+        <select class="f-src">
+          <option value="shts" ${LAST_SRC[v.id]==='zapr'?'':'selected'}>ШТС</option>
+          <option value="zapr" ${LAST_SRC[v.id]==='zapr'?'selected':''}>Заправщик</option>
+        </select>
+        <input class="f-liter" type="number" step="any" min="0" placeholder="литр">
+        <label class="f-full-lb" title="Банкийг дүүртэл цэнэглэсэн бол тэмдэглэнэ — хэрэглээг нарийн тооцох цэг">
+          <input class="f-full" type="checkbox"> Дүүргэсэн
+        </label>
       </div>`).join('');
-    const columns = `<div class="own-col">
-        <div class="mrow fuel head"><span class="mrow-name"></span><span>Олгосон</span><span>Мото</span><span>Үлдсэн</span></div>
-        ${rows}
-      </div>`;
 
-    // Тайлбар ба асуудлын талбарууд машины хүснэгтийн ард, төгсгөлд байрлана
-    const isTail = f => f.name === 'note' || f.group === 'issue';
     form.innerHTML =
-      fields.filter(f => !isTail(f)).map(renderField).join('') +
       `<div class="full">
-        <label class="block-label">Машин тус бүрийн олголт (олгосон / мото цаг / машинд үлдсэн, литрээр)</label>
-        <div class="own-cols">${columns}</div>
+        <div class="fuel-tanks">
+          <div class="ftank">
+            <div class="ftank-head">ШТС</div>
+            <div class="field"><label>Эхний үлдэгдэл / л (өмнөх өдрөөс автоматаар)</label>
+              <input name="shts_opening" type="number" step="any"></div>
+            <div class="field"><label>Орлого / л (татан авалт)</label>
+              <input name="shts_income" type="number" step="any"></div>
+          </div>
+          <div class="ftank">
+            <div class="ftank-head">Заправщик</div>
+            <div class="field"><label>Эхний үлдэгдэл / л (өмнөх өдрөөс автоматаар)</label>
+              <input name="zapr_opening" type="number" step="any"></div>
+            <div class="field"><label>Орлого / л (гаднаас)</label>
+              <input name="zapr_income" type="number" step="any"></div>
+            <div class="field"><label>ШТС-ээс дүүргэсэн / л (дотоод шилжүүлэг)</label>
+              <input name="zapr_from_shts" type="number" step="any"></div>
+          </div>
+        </div>
+      </div>
+      <div class="full">
+        <label class="block-label">Машин тус бүрийн олголт
+          <small class="mut-sm">— эх үүсвэрээ сонгоно · банк дүүртэл цэнэглэсэн бол «Дүүргэсэн» ✓</small></label>
+        <div class="own-col">
+          <div class="mrow fuel4 head"><span class="mrow-name"></span><span>Эх үүсвэр</span><span>Литр</span><span></span></div>
+          ${rows}
+        </div>
       </div>
       <div class="full fuel-summary" id="fuelSummary"></div>` +
-      fields.filter(isTail).map(renderField).join('') +
+      fields.map(renderField).join('') +
       `<div class="form-actions"><button type="reset" class="btn btn-soft">Цэвэрлэх</button><button type="submit" class="btn btn-primary">Илгээх</button></div>`;
 
     form.addEventListener('input', () => updateFuelSummary(form));
+    form.addEventListener('change', e => {
+      if(e.target.classList.contains('f-src')){
+        const row = e.target.closest('.mrow');
+        if(row) LAST_SRC[row.dataset.vid] = e.target.value;   /* эх үүсвэрээ санана */
+      }
+      updateFuelSummary(form);
+    });
     form.addEventListener('reset', () => setTimeout(() => updateFuelSummary(form), 0));
     prefillFuelOpening(form);
     updateFuelSummary(form);
   }
 
   function collectFuelRows(form){
-    return UI.$$('.own-col .mrow[data-vid]', form).map(row => {
+    return UI.$$('.mrow.fuel4[data-vid]', form).map(row => {
       const v = vehicleById(row.dataset.vid);
       return {
         vid: row.dataset.vid,
         name: v ? v.name : '',
-        ownership: v ? v.ownership : '',
+        src: row.querySelector('.f-src').value,
         liter: row.querySelector('.f-liter').value,
-        moto: row.querySelector('.f-moto').value,
-        remain: row.querySelector('.f-remain').value
+        full: row.querySelector('.f-full').checked ? 1 : 0
       };
-    }).filter(r => r.liter || r.moto || r.remain);
+    }).filter(r => r.liter);
+  }
+
+  /** Хоёр агуулахын баланс — form-ын утгуудаас бодит цагт */
+  function fuelBalances(form){
+    const nv = name => parseFloat(form.querySelector(`[name=${name}]`)?.value) || 0;
+    const rows = collectFuelRows(form);
+    const spent = src => rows.filter(r => r.src === src)
+      .reduce((a, r) => a + (parseFloat(r.liter) || 0), 0);
+    const transfer = nv('zapr_from_shts');
+    const shts = {
+      opening: nv('shts_opening'), income: nv('shts_income'), expense: spent('shts'),
+    };
+    shts.closing = Math.round((shts.opening + shts.income - transfer - shts.expense) * 100) / 100;
+    const zapr = {
+      opening: nv('zapr_opening'), income: nv('zapr_income'), expense: spent('zapr'),
+    };
+    zapr.closing = Math.round((zapr.opening + zapr.income + transfer - zapr.expense) * 100) / 100;
+    return {shts, zapr, transfer, rows};
   }
 
   function updateFuelSummary(form){
     const box = UI.$('#fuelSummary', form);
     if(!box) return;
-    const opening = parseFloat(form.querySelector('[name=fuel_opening_liter]')?.value) || 0;
-    const income  = parseFloat(form.querySelector('[name=fuel_income_liter]')?.value) || 0;
-    const expense = collectFuelRows(form).reduce((a,r) => a + (parseFloat(r.liter)||0), 0);
-    const closing = opening + income - expense;
-    const neg = closing < 0;
+    const {shts, zapr} = fuelBalances(form);
+    const totClosing = shts.closing + zapr.closing;
+    const totExpense = shts.expense + zapr.expense;
+    const neg = shts.closing < 0 || zapr.closing < 0;
     box.innerHTML = `<div class="fuel-calc ${neg?'fuel-neg':''}">
-      <span>Орлого: <b>${UI.fmt(income)} л</b></span>
-      <span>Зарлага: <b>${UI.fmt(expense)} л</b></span>
-      <span>Үлдэгдэл: <b>${UI.fmt(closing)} л</b></span>
-      ${neg ? '<span class="fuel-warn-txt">⚠ Сөрөг үлдэгдэл — орлого эсвэл олголтын тоо алдаатай байж магадгүй. Шалгаад илгээнэ үү.</span>' : ''}
+      <span>ШТС үлдэгдэл: <b>${UI.fmt(shts.closing)} л</b></span>
+      <span>Заправщик үлдэгдэл: <b>${UI.fmt(zapr.closing)} л</b></span>
+      <span>Нийт зарлага: <b>${UI.fmt(totExpense)} л</b></span>
+      <span>Нийт үлдэгдэл: <b>${UI.fmt(totClosing)} л</b></span>
+      ${neg ? '<span class="fuel-warn-txt">⚠ Аль нэг агуулах сөрөг үлдэгдэлтэй — орлого, шилжүүлэг эсвэл олголтын тоог шалгана уу.</span>' : ''}
     </div>`;
   }
 
-  /** Өмнөх өдрийн түлшний үлдэгдлийг автоматаар эхний үлдэгдэлд тавина */
+  /** Өмнөх өдрийн агуулах тус бүрийн үлдэгдлийг эхний үлдэгдэлд тавина */
   async function prefillFuelOpening(form){
-    const input = form.querySelector('[name=fuel_opening_liter]');
-    if(!input || input.value) return;
+    const shtsIn = form.querySelector('[name=shts_opening]');
+    const zaprIn = form.querySelector('[name=zapr_opening]');
+    if(!shtsIn || shtsIn.value || (zaprIn && zaprIn.value)) return;
     try{
-      const d = new Date(UI.$('#reportDate').value || UI.today());
+      const d = new Date((UI.$('#reportDate').value || UI.today()) + 'T00:00:00');
       d.setDate(d.getDate() - 1);
-      const res = await API.daily(d.toISOString().slice(0,10));
+      const iso = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+      const res = await API.daily(iso);
       const fuel = (res.reports || []).find(r => r.report_type === 'fuel');
       if(fuel && fuel.data){
-        const prev = fuel.data.fuel_closing_liter ?? fuel.data.fuel_truck_closing_liter;
-        if(prev !== undefined && prev !== null && input.value === ''){
-          input.value = prev;
-          updateFuelSummary(form);
+        const fd = fuel.data;
+        if(fd.shts_closing !== undefined && fd.shts_closing !== null){
+          shtsIn.value = fd.shts_closing;
+          if(zaprIn && fd.zapr_closing !== undefined) zaprIn.value = fd.zapr_closing;
+        } else if(fd.fuel_closing_liter !== undefined && fd.fuel_closing_liter !== null){
+          /* Хуучин нэг-агуулахт тайлан — нийт үлдэгдлийг ШТС-д тавина */
+          shtsIn.value = fd.fuel_closing_liter;
         }
+        updateFuelSummary(form);
       }
     }catch(e){ /* өмнөх өдрийн тайлан байхгүй бол хоосон үлдээнэ */ }
   }
@@ -2655,15 +2738,21 @@ const PageReport = () => {
     const data = {};
     for(const [k,v] of fd.entries()){ data[k] = (v === '') ? null : v; }
 
-    // Түлшний тайлан: машин тус бүрийн мөр + автомат орлого/зарлага/үлдэгдэл
+    // Түлшний тайлан (2026-08): ШТС + Заправщик хоёр агуулах.
+    // Хуучин нийт талбаруудыг автоматаар тооцоолж хадгална — самбар,
+    // AI, Aggregate өөрчлөлтгүй ажиллана.
     if(reportType === 'fuel'){
-      const rows = collectFuelRows(formEl);
-      const opening = parseFloat(data.fuel_opening_liter) || 0;
-      const income  = parseFloat(data.fuel_income_liter) || 0;
-      const expense = rows.reduce((a,r) => a + (parseFloat(r.liter)||0), 0);
+      const {shts, zapr, rows} = fuelBalances(formEl);
       data.vehicle_rows = rows;
-      data.fuel_expense_liter = expense;
-      data.fuel_closing_liter = Math.round((opening + income - expense) * 100) / 100;
+      data.shts_expense = shts.expense;
+      data.shts_closing = shts.closing;
+      data.zapr_expense = zapr.expense;
+      data.zapr_closing = zapr.closing;
+      /* Хуучин нийт талбарууд: шилжүүлэг орлогод ТООЦОГДОХГҮЙ (дотоод) */
+      data.fuel_opening_liter = shts.opening + zapr.opening;
+      data.fuel_income_liter  = shts.income + zapr.income;
+      data.fuel_expense_liter = shts.expense + zapr.expense;
+      data.fuel_closing_liter = Math.round((shts.closing + zapr.closing) * 100) / 100;
     }
 
     // Тээврийн тайлан (2026-08 шинэ бүтэц): рейс бүрийн бүртгэл + хуучин
