@@ -761,6 +761,7 @@ const KpiCards = (() => {
       const fullRow = c.fullRow ? 'card-full' : '';
 
       if(!r){
+        /* Тайлангүй карт — data-key өгөхгүй (дарахад үзэх зүйлгүй) */
         return `<div class="bezel card card-missing ${featured} ${fullRow}"><span class="tick-a"></span><span class="tick-b"></span>
           <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span></div>
           <div class="value">—</div><div class="sub">Тайлан ороогүй</div></div>`;
@@ -802,7 +803,10 @@ const KpiCards = (() => {
         : `<div class="value-row"><div class="value"><span class="count" data-count="${val}">${UI.fmt(val)}</span>${c.unit ? ' <span class="unit">'+c.unit+'</span>' : ''}</div>${trendChip}</div>`;
       const wide = (c.viz && miniHtml) ? 'card-wide' : '';
       const subTxt = c.sub(r.data);
-      return `<div class="bezel card ${warn?'card-warn':''} ${featured} ${wide} ${fullRow}"><span class="tick-a"></span><span class="tick-b"></span>
+      /* data-key — самбар дээр дарахад тухайн модулийн дэлгэрэнгүй нээгдэнэ
+         (зөвхөн .cards-clickable контейнерт идэвхжинэ — хурлын хуудсанд үгүй) */
+      return `<div class="bezel card ${warn?'card-warn':''} ${featured} ${wide} ${fullRow}" data-key="${c.key}"
+        title="Дэлгэрэнгүй харах"><span class="tick-a"></span><span class="tick-b"></span>
         <div class="card-tag-row"><span class="label">${chip}${UI.esc(c.label)}</span>${isViz ? trendChip : ''}</div>
         ${valueRow}
         ${miniHtml}
@@ -1220,8 +1224,22 @@ const PageDashboard = () => {
       dailyPrevMap = Aggregate.byType(prev.reports);
       periodDays = new Set((cur.reports||[]).map(r => r.date)).size;
       renderStatusRow();
-      KpiCards.render(UI.$('#summaryCards'), dailyMap, dailyPrevMap,
+      const cardsBox = UI.$('#summaryCards');
+      KpiCards.render(cardsBox, dailyMap, dailyPrevMap,
                       {plan: dashPlan, date: dashDate, span: dashSpan});
+      /* КАРТ ДАРАХАД дэлгэрэнгүй нээгдэнэ (2026-08). Зөвхөн самбарт —
+         хурлын хуудсанд ижил картууд байдаг ч moduleDetail байхгүй. */
+      cardsBox.classList.add('cards-clickable');
+      if(!cardsBox.dataset.detailBound){
+        cardsBox.dataset.detailBound = '1';
+        cardsBox.addEventListener('click', e => {
+          const card = e.target.closest('.card[data-key]');
+          if(!card) return;
+          renderModuleDetail(card.dataset.key);
+          const det = UI.$('#moduleDetail');
+          if(det) det.scrollIntoView({behavior: 'smooth', block: 'start'});
+        });
+      }
       renderWeather(dailyMap.hse);
       renderSafety(periodTo);
       renderPeriodExtras(cur);
@@ -2200,20 +2218,17 @@ const PageReport = () => {
     catch(e){ TMETA = {companies:[], brands:[], routes:[], migrated:false}; }
   }
 
-  /* ---------------- Excel (CSV) татах (2026-08) ----------------
-     Ажилтан өөрийн эрхтэй төрлөө, админ бүх төрөл + «Бүгд»-ийг татна.
-     UTF-8 BOM + sep=, толгойтой тул Excel шууд зөв нээнэ (кирилл эвдрэхгүй,
-     багана зөв салдаг). Гадны сан ашиглаагүй. */
+  /* ---------------- Excel татах (2026-08, v2: SpreadsheetML) ----------------
+     CSV-д Excel-ийн алдаа (sep= мөртэй үед BOM-оо мартдаг) кириллийг эвддэг
+     байсан тул Excel 2003 XML (SpreadsheetML) формат руу шилжсэн: цэвэр XML,
+     гадны сангүй, ОЛОН SHEET дэмжинэ, UTF-8 найдвартай. Нээхэд Excel
+     «формат таарахгүй» гэсэн асуулт гаргаж болно — Yes гэж нээнэ (хэвийн).
+     Төрөл бүр өөрийн sheet + задаргаа тусдаа sheet-үүдэд.
+     «Бүх мэдээлэл» баталгаа: тохируулсан багануудаас гадна data_json-д
+     байгаа БУСАД бүх түлхүүрийг автоматаар нэмж гаргана. */
   const SEV_MAP = {low:'Бага', medium:'Дунд', high:'Өндөр', '':''};
   const CAT_MAP = {sludge:'Шлам', waste:'Хаягдал', product:'Бүтээгдэхүүн', short:'Богино'};
 
-  function csvEsc(v){
-    v = (v === null || v === undefined) ? '' : String(v);
-    return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
-  }
-  const csvRow = arr => arr.map(csvEsc).join(',');
-
-  /* Төрөл бүрийн үндсэн баганууд: тооцоолсон талбарууд + form-ын талбарууд */
   const EXPORT_EXTRA = {
     transport: [
       ['sludge_trips','Шлам рейс'], ['sludge_ton','Шлам тонн'],
@@ -2235,67 +2250,110 @@ const PageReport = () => {
       ['main_working_count','Ажилласан'], ['repair_count','Засварт']
     ]
   };
+  /* Задаргааны хэсэгт очдог тул үндсэн хүснэгтэд давтахгүй түлхүүрүүд */
+  const EXPORT_SKIP = ['vehicle_rows', 'trips', 'vehicle_status'];
 
-  function exportColumns(key){
+  const xmlEsc = s => String(s ?? '')
+    .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+    .replace(/"/g,'&quot;').replace(/'/g,'&apos;');
+
+  function cellXml(v, head){
+    const isNum = !head && v !== '' && v !== null && v !== undefined &&
+      typeof v !== 'boolean' && isFinite(v) && String(v).trim() !== '';
+    return '<Cell' + (head ? ' ss:StyleID="h"' : '') + '><Data ss:Type="' +
+      (isNum ? 'Number' : 'String') + '">' + xmlEsc(v) + '</Data></Cell>';
+  }
+  const rowXml = (arr, head) => '<Row>' + arr.map(c => cellXml(c, head)).join('') + '</Row>';
+
+  function sheetXml(name, headerRow, rows){
+    /* Sheet нэрний хориглосон тэмдэгт + 31 тэмдэгтийн хязгаар */
+    const safe = name.replace(/[\\\/\?\*\[\]:]/g, ' ').slice(0, 31);
+    return '<Worksheet ss:Name="' + xmlEsc(safe) + '"><Table>' +
+      rowXml(headerRow, true) + rows.map(r => rowXml(r)).join('') +
+      '</Table></Worksheet>';
+  }
+
+  function buildWorkbook(sheets){
+    return '<?xml version="1.0" encoding="UTF-8"?>' +
+      '<?mso-application progid="Excel.Sheet"?>' +
+      '<Workbook xmlns="urn:schemas-microsoft-com:office:spreadsheet" ' +
+      'xmlns:ss="urn:schemas-microsoft-com:office:spreadsheet">' +
+      '<Styles><Style ss:ID="h"><Font ss:Bold="1"/>' +
+      '<Interior ss:Color="#F2F3F2" ss:Pattern="Solid"/></Style></Styles>' +
+      sheets.join('') + '</Workbook>';
+  }
+
+  /* Төрлийн үндсэн баганууд + data_json-ы БҮХ үлдсэн түлхүүр (юу ч орхигдохгүй) */
+  function exportColumns(key, list){
     const cols = (EXPORT_EXTRA[key] || []).slice();
     (CONFIG.forms[key] || []).forEach(f => {
       if(f.type === 'sep' || !f.name) return;
       if(cols.some(c => c[0] === f.name)) return;
       cols.push([f.name, f.label, f.options || null]);
     });
+    const covered = new Set([...cols.map(c => c[0]), ...EXPORT_SKIP]);
+    for(const r of list){
+      for(const k of Object.keys(r.data || {})){
+        const v = r.data[k];
+        if(covered.has(k) || v === null || typeof v === 'object') continue;
+        covered.add(k);
+        cols.push([k, k, null]);        /* тохируулаагүй талбар — түлхүүрээрээ */
+      }
+    }
     return cols;
   }
 
-  function csvForType(key, reports){
+  function sheetsForType(key, reports){
     const type = CONFIG.reportTypes.find(t => t.key === key) || {name: key};
     const list = reports.filter(r => r.report_type === key)
       .sort((a, b) => a.date < b.date ? -1 : 1);
-    if(!list.length) return '';
-    const cols = exportColumns(key);
-    let out = type.name + '\n';
-    out += csvRow(['Огноо', ...cols.map(c => c[1]), 'Илгээсэн']) + '\n';
-    for(const r of list){
+    if(!list.length) return [];
+    const cols = exportColumns(key, list);
+    const main = list.map(r => {
       const d = r.data || {};
-      out += csvRow([r.date, ...cols.map(c => {
+      return [r.date, ...cols.map(c => {
         let v = d[c[0]];
         if(c[0] === 'issue_severity' || c[0] === 'severity') v = SEV_MAP[v] ?? v;
         else if(c[2]){ const o = c[2].find(x => x[0] === String(v ?? '')); if(o) v = o[1]; }
         return v ?? '';
-      }), r.submitted_by_name || '']) + '\n';
-    }
+      }), r.submitted_by_name || ''];
+    });
+    const sheets = [sheetXml(type.name, ['Огноо', ...cols.map(c => c[1]), 'Илгээсэн'], main)];
 
-    /* Задаргааны хэсгүүд */
     if(key === 'transport'){
       const trips = [];
       list.forEach(r => (r.data.trips || []).forEach(t => trips.push([r.date,
-        (t.brand ? t.brand + ' · ' : '') + (t.no || ''), t.route || '', CAT_MAP[t.cat] || t.cat, t.km ?? '', t.ton ?? ''])));
+        (t.brand ? t.brand + ' · ' : '') + (t.no || ''), t.route || '',
+        CAT_MAP[t.cat] || t.cat || '', t.km ?? '', t.ton ?? ''])));
       if(trips.length){
-        out += '\nРейсийн задаргаа\n' + csvRow(['Огноо','Машин','Чиглэл','Ангилал','Км','Тонн']) + '\n'
-          + trips.map(csvRow).join('\n') + '\n';
+        sheets.push(sheetXml('Тээвэр - рейс',
+          ['Огноо','Машин','Чиглэл','Ангилал','Км','Тонн'], trips));
       } else {
         const rows = [];
         list.forEach(r => (r.data.vehicle_rows || []).forEach(v => rows.push([r.date,
           v.name || '', CAT_MAP[v.purpose] || v.purpose || '', v.trips ?? '', v.ton ?? ''])));
-        if(rows.length) out += '\nМашины задаргаа\n' + csvRow(['Огноо','Машин','Ангилал','Рейс','Тонн']) + '\n'
-          + rows.map(csvRow).join('\n') + '\n';
+        if(rows.length) sheets.push(sheetXml('Тээвэр - машин',
+          ['Огноо','Машин','Ангилал','Рейс','Тонн'], rows));
       }
     }
     if(key === 'fuel'){
       const rows = [];
       list.forEach(r => (r.data.vehicle_rows || []).forEach(v => rows.push([r.date,
-        v.name || '', v.src ? (v.src === 'shts' ? 'ШТС' : 'Заправщик') : (CONFIG.ownershipLabels[v.ownership] || ''),
-        v.liter ?? '', v.full ? 'Дүүргэсэн' : ''])));
-      if(rows.length) out += '\nОлголтын задаргаа\n' + csvRow(['Огноо','Машин','Эх үүсвэр','Литр','Банк']) + '\n'
-        + rows.map(csvRow).join('\n') + '\n';
+        v.name || '',
+        v.src ? (v.src === 'shts' ? 'ШТС' : 'Заправщик') : (CONFIG.ownershipLabels[v.ownership] || v.ownership || ''),
+        v.liter ?? '', v.full ? 'Дүүргэсэн' : '',
+        v.moto ?? '', v.remain ?? ''])));
+      if(rows.length) sheets.push(sheetXml('Түлш - олголт',
+        ['Огноо','Машин','Эх үүсвэр','Литр','Банк','Мото','Үлдсэн'], rows));
     }
     if(key === 'equipment'){
       const rows = [];
       list.forEach(r => (r.data.vehicle_status || []).forEach(v => rows.push([r.date,
         v.no || '', v.st === 'rep' ? 'Засварт' : 'Хэвийн', v.reason || ''])));
-      if(rows.length) out += '\nМашины төлөв\n' + csvRow(['Огноо','Машин','Төлөв','Шалтгаан']) + '\n'
-        + rows.map(csvRow).join('\n') + '\n';
+      if(rows.length) sheets.push(sheetXml('Техник - төлөв',
+        ['Огноо','Машин','Төлөв','Шалтгаан'], rows));
     }
-    return out + '\n';
+    return sheets;
   }
 
   function initExportPanel(){
@@ -2305,19 +2363,18 @@ const PageReport = () => {
     const perms = session.permissions || [];
     const myTypes = isAdmin ? CONFIG.reportTypes.map(t => t.key)
                             : CONFIG.reportTypes.map(t => t.key).filter(k => perms.includes(k));
-    if(!myTypes.length) return;                 /* эрхгүй бол панел гарахгүй */
+    if(!myTypes.length) return;
     panel.classList.remove('hidden');
 
     const typeSel = UI.$('#exType');
     typeSel.innerHTML =
-      (myTypes.length > 1 ? `<option value="__all__">Бүгд (${myTypes.length} төрөл)</option>` : '') +
+      (myTypes.length > 1 ? '<option value="__all__">Бүгд (' + myTypes.length + ' төрөл)</option>' : '') +
       myTypes.map(k => {
         const t = CONFIG.reportTypes.find(x => x.key === k);
-        return `<option value="${k}">${UI.esc(t ? t.name : k)}</option>`;
+        return '<option value="' + k + '">' + UI.esc(t ? t.name : k) + '</option>';
       }).join('');
     if(myTypes.length === 1) typeSel.value = myTypes[0];
 
-    /* Анхдагч хугацаа: тухайн сарын 1 → өнөөдөр */
     const today = UI.today();
     UI.$('#exFrom').value = today.slice(0, 8) + '01';
     UI.$('#exTo').value = today;
@@ -2333,21 +2390,19 @@ const PageReport = () => {
         const res = await API.range(from, to);
         const reports = res.reports || [];
         const keys = typeSel.value === '__all__' ? myTypes : [typeSel.value];
-        let body = '';
-        for(const k of keys) body += csvForType(k, reports);
-        if(!body){
+        let sheets = [];
+        for(const k of keys) sheets = sheets.concat(sheetsForType(k, reports));
+        if(!sheets.length){
           UI.alertBox(msg, 'Энэ хугацаанд тайлан олдсонгүй.');
         } else {
-          const head = 'sep=,\n' + csvRow(['Говь Ресурс Девелопмент — тайлангийн экспорт']) + '\n'
-            + csvRow(['Хугацаа', from + ' — ' + to]) + '\n\n';
-          const blob = new Blob(['﻿' + head + body], {type: 'text/csv;charset=utf-8'});
+          const blob = new Blob([buildWorkbook(sheets)], {type: 'application/vnd.ms-excel'});
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
           a.download = 'GRD_' + (typeSel.value === '__all__' ? 'buh_tailan' : typeSel.value)
-            + '_' + from + '_' + to + '.csv';
+            + '_' + from + '_' + to + '.xls';
           a.click();
           setTimeout(() => URL.revokeObjectURL(a.href), 5000);
-          UI.alertBox(msg, 'Татагдлаа — Excel-ээр нээнэ үү.', true);
+          UI.alertBox(msg, 'Татагдлаа. Excel «формат таарахгүй» гэж асуувал Yes гэж нээнэ үү — хэвийн.', true);
         }
       }catch(err){ UI.alertBox(msg, err.message); }
       btn.disabled = false; btn.textContent = '⬇ Татах';

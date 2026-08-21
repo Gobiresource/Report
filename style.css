@@ -1693,3 +1693,14 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
 .export-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
 .export-row .field{margin:0;min-width:150px}
 .export-row .btn{height:42px}
+
+/* --- KPI карт дарж дэлгэрэнгүй нээх (2026-08, зөвхөн самбарт) --- */
+.cards-clickable .card[data-key]{cursor:pointer;
+  transition:transform .14s cubic-bezier(.23,1,.32,1), box-shadow .14s}
+.cards-clickable .card[data-key]:hover{transform:translateY(-2px);
+  box-shadow:0 18px 44px rgba(35,45,60,.11)}
+.cards-clickable .card[data-key]:active{transform:translateY(0) scale(.995)}
+@media(prefers-reduced-motion:reduce){
+  .cards-clickable .card[data-key]{transition:none}
+  .cards-clickable .card[data-key]:hover{transform:none}
+}
