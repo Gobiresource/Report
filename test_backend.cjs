@@ -160,14 +160,49 @@ async function callApi(onRequest, env, method, route, body){
   check('any auth user lists vehicles', r.status === 200 && r.data.vehicles.length === 36, {len:r.data.vehicles?.length});
   r = await callApi(onRequest, env, 'POST', 'vehicles/save', {username:'camp', pin:'5555', vehicle:{name:'Шинэ машин', purpose:'sludge', ownership:'own'}});
   check('camp CANNOT add vehicle (403)', r.status === 403);
-  r = await callApi(onRequest, env, 'POST', 'vehicles/save', {username:'teever', pin:'2222', vehicle:{name:'11-22 АБВ шинэ', purpose:'product', ownership:'rental_product'}});
-  check('teever adds vehicle', r.status === 200 && r.data.vehicles.length === 37, {len:r.data.vehicles?.length});
+  /* 2026-08: машины бүртгэл Техникийн хэсэгт шилжсэн — тээврийн ажилтан
+     нэмэх эрхгүй, техникийн ажилтан (technik) нэмнэ. */
+  r = await callApi(onRequest, env, 'POST', 'vehicles/save', {username:'teever', pin:'2222', vehicle:{name:'11-22 АБВ шинэ'}});
+  check('teever CANNOT add vehicle (403)', r.status === 403);
+  r = await callApi(onRequest, env, 'POST', 'vehicles/save', {username:'technik', pin:'4444', vehicle:{name:'11-22 АБВ шинэ', purpose:'product', ownership:'rental_product'}});
+  check('technik adds vehicle', r.status === 200 && r.data.vehicles.length === 37, {len:r.data.vehicles?.length});
   const newV = r.data.vehicles.find(v=>v.name==='11-22 АБВ шинэ');
   check('new vehicle fields saved', newV && newV.purpose==='product' && newV.ownership==='rental_product', newV);
   r = await callApi(onRequest, env, 'POST', 'vehicles/remove', {username:'admin', pin:'9999', id:newV.id});
   check('admin removes vehicle', r.status === 200 && r.data.vehicles.length === 36);
-  r = await callApi(onRequest, env, 'POST', 'vehicles/save', {username:'teever', pin:'2222', vehicle:{name:'  '}});
+  r = await callApi(onRequest, env, 'POST', 'vehicles/save', {username:'technik', pin:'4444', vehicle:{name:'  '}});
   check('empty name rejected', r.status === 400);
+
+  console.log('\n== /api/tmeta (2026-08 шинэ) ==');
+  // schema.sql-д шинэ хүснэгтүүд байхгүй тул migrated:false буцаах ёстой
+  r = await callApi(onRequest, env, 'POST', 'tmeta', {username:'camp', pin:'5555'});
+  check('tmeta without migration -> migrated:false', r.status === 200 && r.data.migrated === false);
+  // Миграцийг тест дотор ажиллуулаад дахин шалгана
+  const mig = fs.readFileSync(path.join(__dirname, 'migration_transport.sql'), 'utf8');
+  db.exec(mig);
+  r = await callApi(onRequest, env, 'POST', 'tmeta', {username:'camp', pin:'5555'});
+  check('tmeta after migration -> migrated:true + GRD seeded',
+    r.status === 200 && r.data.migrated === true && r.data.companies.some(c=>c.name==='GRD'), r.data.companies);
+  r = await callApi(onRequest, env, 'POST', 'tmeta/add', {username:'camp', pin:'5555', kind:'route', name:'Тест', km:10, cat:'waste'});
+  check('camp CANNOT add route (403)', r.status === 403);
+  r = await callApi(onRequest, env, 'POST', 'tmeta/add', {username:'teever', pin:'2222', kind:'route', name:'Хаягдал далан', km:43, cat:'waste'});
+  check('teever adds route', r.status === 200 && r.data.routes.some(x=>x.name==='Хаягдал далан' && x.km===43));
+  r = await callApi(onRequest, env, 'POST', 'tmeta/add', {username:'technik', pin:'4444', kind:'brand', name:'Howo'});
+  check('technik adds brand', r.status === 200 && r.data.brands.some(x=>x.name==='Howo'));
+  const rtId = r.data.routes.find(x=>x.name==='Хаягдал далан').id;
+  r = await callApi(onRequest, env, 'POST', 'tmeta/remove', {username:'teever', pin:'2222', kind:'route', id:rtId});
+  check('teever removes route', r.status === 200 && !r.data.routes.some(x=>x.id===rtId));
+  // company устгалт: GRD дээр машин байхгүй тул устгагдана, дараа нь буцааж нэмнэ
+  r = await callApi(onRequest, env, 'POST', 'tmeta/add', {username:'technik', pin:'4444', kind:'company', name:'HAN'});
+  check('technik adds company', r.status === 200 && r.data.companies.some(x=>x.name==='HAN'));
+  // Шинэ бүтцээр машин нэмээд компани нь хамгаалагдахыг шалгана
+  r = await callApi(onRequest, env, 'POST', 'vehicles/save', {username:'technik', pin:'4444', vehicle:{name:'0125 УБА', company:'HAN', brand:'Howo'}});
+  const hanV = r.data.vehicles.find(v=>v.name==='0125 УБА');
+  check('vehicle saved with company/brand', hanV && hanV.company==='HAN' && hanV.brand==='Howo', hanV);
+  const hanId = (await callApi(onRequest, env, 'POST', 'tmeta', {username:'admin', pin:'9999'})).data.companies.find(c=>c.name==='HAN').id;
+  r = await callApi(onRequest, env, 'POST', 'tmeta/remove', {username:'admin', pin:'9999', kind:'company', id:hanId});
+  check('company with vehicles protected', r.status === 400);
+  await callApi(onRequest, env, 'POST', 'vehicles/remove', {username:'admin', pin:'9999', id:hanV.id});
 
   console.log('\n== /api/plan ==');
   r = await callApi(onRequest, env, 'POST', 'plan', {username:'admin', pin:'9999', month:'2026-07'});

@@ -2162,7 +2162,9 @@ const PageReport = () => {
   // form-ыг дахин зурж, машинуудыг гаргана. selectReport энэ үед аль хэдийн бэлэн.
   Promise.all([loadVehicles(), loadTMeta()]).then(() => {
     const perms = session.permissions || [];
-    const canManage = roleKey === 'admin' || perms.includes('transport') || perms.includes('equipment');
+    /* Машины бүртгэл = Техникийн хэсгийн ажил. Тээврийн ажилтанд харагдахгүй —
+       тэр зөвхөн өөрийн form доторх чиглэлийн ангиллыг удирдана. */
+    const canManage = roleKey === 'admin' || perms.includes('equipment');
     if(canManage) renderVehicleManager();
     const form = UI.$('#dynamicReportForm');
     const key = form && form.dataset.reportType;

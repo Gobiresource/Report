@@ -159,11 +159,13 @@ async function handleMonthly(db, body) {
   return ok({month: body.month, reports});
 }
 
-// Машины бүртгэл удирдах эрх: admin эсвэл тээврийн тайлан оруулах эрхтэй хүн
+// Машины бүртгэл удирдах эрх (2026-08): бүртгэл Техникийн хэсэгт харьяалагдах
+// болсон тул admin эсвэл ТЕХНИКИЙН тайлан оруулах эрхтэй хүн.
+// (Чиглэл/компани/маркийн tmeta эрх нь canManageFleet — тусдаа.)
 async function canManageVehicles(db, user) {
   if (!user || !user.active) return false;
   if (user.role === 'admin') return true;
-  return await canSubmit(db, user, 'transport');
+  return await canSubmit(db, user, 'equipment');
 }
 
 async function handleVehiclesList(db, body) {
