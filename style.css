@@ -1688,3 +1688,8 @@ b.plan-good{color:var(--green)} b.plan-mid{color:var(--c-transport)} b.plan-low{
 .f-full-lb{display:flex;align-items:center;gap:5px;font-size:11px;font-weight:600;
   color:var(--ink-2);cursor:pointer;white-space:nowrap}
 .f-full-lb input{accent-color:var(--brand)}
+
+/* --- Excel татах панел (2026-08) --- */
+.export-row{display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap}
+.export-row .field{margin:0;min-width:150px}
+.export-row .btn{height:42px}

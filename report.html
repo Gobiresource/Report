@@ -51,6 +51,19 @@
       <div id="myTasksList"></div>
     </section>
 
+    <section id="exportPanel" class="bezel panel hidden"><span class="tick-a"></span><span class="tick-b"></span>
+      <div class="panel-head">
+        <div><h3>Тайлан Excel татах</h3><p id="exportSub">Эхлэх, дуусах огноогоо сонгоод татна. Excel-д шууд нээгдэнэ.</p></div>
+      </div>
+      <div class="export-row">
+        <div class="field"><label>Эхлэх</label><input id="exFrom" type="date"></div>
+        <div class="field"><label>Дуусах</label><input id="exTo" type="date"></div>
+        <div class="field"><label>Тайлан</label><select id="exType"></select></div>
+        <button type="button" class="btn btn-primary" id="exBtn">⬇ Татах</button>
+      </div>
+      <div id="exportMsg"></div>
+    </section>
+
     <section id="reportPicker" class="bezel panel"><span class="tick-a"></span><span class="tick-b"></span>
       <div class="panel-head">
         <div><h3>Тайлангийн төрөл</h3><p>Зөвхөн таны оруулах эрхтэй тайлангууд харагдана.</p></div>

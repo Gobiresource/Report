@@ -2200,6 +2200,161 @@ const PageReport = () => {
     catch(e){ TMETA = {companies:[], brands:[], routes:[], migrated:false}; }
   }
 
+  /* ---------------- Excel (CSV) татах (2026-08) ----------------
+     Ажилтан өөрийн эрхтэй төрлөө, админ бүх төрөл + «Бүгд»-ийг татна.
+     UTF-8 BOM + sep=, толгойтой тул Excel шууд зөв нээнэ (кирилл эвдрэхгүй,
+     багана зөв салдаг). Гадны сан ашиглаагүй. */
+  const SEV_MAP = {low:'Бага', medium:'Дунд', high:'Өндөр', '':''};
+  const CAT_MAP = {sludge:'Шлам', waste:'Хаягдал', product:'Бүтээгдэхүүн', short:'Богино'};
+
+  function csvEsc(v){
+    v = (v === null || v === undefined) ? '' : String(v);
+    return /[",\n;]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+  }
+  const csvRow = arr => arr.map(csvEsc).join(',');
+
+  /* Төрөл бүрийн үндсэн баганууд: тооцоолсон талбарууд + form-ын талбарууд */
+  const EXPORT_EXTRA = {
+    transport: [
+      ['sludge_trips','Шлам рейс'], ['sludge_ton','Шлам тонн'],
+      ['waste_trips','Хаягдал рейс'], ['waste_ton','Хаягдал тонн'],
+      ['product_transport_trips','Бүтээгдэхүүн рейс'], ['product_transport_ton','Бүтээгдэхүүн тонн'],
+      ['short_waste_trips','Богино рейс'], ['short_waste_ton','Богино тонн'],
+      ['total_km','Нийт гүйлт км']
+    ],
+    fuel: [
+      ['shts_opening','ШТС эхний'], ['shts_income','ШТС орлого'],
+      ['shts_expense','ШТС зарлага'], ['shts_closing','ШТС үлдэгдэл'],
+      ['zapr_opening','Запр. эхний'], ['zapr_income','Запр. орлого (гаднаас)'],
+      ['zapr_from_shts','ШТС-ээс дүүргэсэн'], ['zapr_expense','Запр. зарлага'],
+      ['zapr_closing','Запр. үлдэгдэл'],
+      ['fuel_opening_liter','Нийт эхний'], ['fuel_income_liter','Нийт орлого'],
+      ['fuel_expense_liter','Нийт зарлага'], ['fuel_closing_liter','Нийт үлдэгдэл']
+    ],
+    equipment: [
+      ['main_working_count','Ажилласан'], ['repair_count','Засварт']
+    ]
+  };
+
+  function exportColumns(key){
+    const cols = (EXPORT_EXTRA[key] || []).slice();
+    (CONFIG.forms[key] || []).forEach(f => {
+      if(f.type === 'sep' || !f.name) return;
+      if(cols.some(c => c[0] === f.name)) return;
+      cols.push([f.name, f.label, f.options || null]);
+    });
+    return cols;
+  }
+
+  function csvForType(key, reports){
+    const type = CONFIG.reportTypes.find(t => t.key === key) || {name: key};
+    const list = reports.filter(r => r.report_type === key)
+      .sort((a, b) => a.date < b.date ? -1 : 1);
+    if(!list.length) return '';
+    const cols = exportColumns(key);
+    let out = type.name + '\n';
+    out += csvRow(['Огноо', ...cols.map(c => c[1]), 'Илгээсэн']) + '\n';
+    for(const r of list){
+      const d = r.data || {};
+      out += csvRow([r.date, ...cols.map(c => {
+        let v = d[c[0]];
+        if(c[0] === 'issue_severity' || c[0] === 'severity') v = SEV_MAP[v] ?? v;
+        else if(c[2]){ const o = c[2].find(x => x[0] === String(v ?? '')); if(o) v = o[1]; }
+        return v ?? '';
+      }), r.submitted_by_name || '']) + '\n';
+    }
+
+    /* Задаргааны хэсгүүд */
+    if(key === 'transport'){
+      const trips = [];
+      list.forEach(r => (r.data.trips || []).forEach(t => trips.push([r.date,
+        (t.brand ? t.brand + ' · ' : '') + (t.no || ''), t.route || '', CAT_MAP[t.cat] || t.cat, t.km ?? '', t.ton ?? ''])));
+      if(trips.length){
+        out += '\nРейсийн задаргаа\n' + csvRow(['Огноо','Машин','Чиглэл','Ангилал','Км','Тонн']) + '\n'
+          + trips.map(csvRow).join('\n') + '\n';
+      } else {
+        const rows = [];
+        list.forEach(r => (r.data.vehicle_rows || []).forEach(v => rows.push([r.date,
+          v.name || '', CAT_MAP[v.purpose] || v.purpose || '', v.trips ?? '', v.ton ?? ''])));
+        if(rows.length) out += '\nМашины задаргаа\n' + csvRow(['Огноо','Машин','Ангилал','Рейс','Тонн']) + '\n'
+          + rows.map(csvRow).join('\n') + '\n';
+      }
+    }
+    if(key === 'fuel'){
+      const rows = [];
+      list.forEach(r => (r.data.vehicle_rows || []).forEach(v => rows.push([r.date,
+        v.name || '', v.src ? (v.src === 'shts' ? 'ШТС' : 'Заправщик') : (CONFIG.ownershipLabels[v.ownership] || ''),
+        v.liter ?? '', v.full ? 'Дүүргэсэн' : ''])));
+      if(rows.length) out += '\nОлголтын задаргаа\n' + csvRow(['Огноо','Машин','Эх үүсвэр','Литр','Банк']) + '\n'
+        + rows.map(csvRow).join('\n') + '\n';
+    }
+    if(key === 'equipment'){
+      const rows = [];
+      list.forEach(r => (r.data.vehicle_status || []).forEach(v => rows.push([r.date,
+        v.no || '', v.st === 'rep' ? 'Засварт' : 'Хэвийн', v.reason || ''])));
+      if(rows.length) out += '\nМашины төлөв\n' + csvRow(['Огноо','Машин','Төлөв','Шалтгаан']) + '\n'
+        + rows.map(csvRow).join('\n') + '\n';
+    }
+    return out + '\n';
+  }
+
+  function initExportPanel(){
+    const panel = UI.$('#exportPanel');
+    if(!panel) return;
+    const isAdmin = roleKey === 'admin';
+    const perms = session.permissions || [];
+    const myTypes = isAdmin ? CONFIG.reportTypes.map(t => t.key)
+                            : CONFIG.reportTypes.map(t => t.key).filter(k => perms.includes(k));
+    if(!myTypes.length) return;                 /* эрхгүй бол панел гарахгүй */
+    panel.classList.remove('hidden');
+
+    const typeSel = UI.$('#exType');
+    typeSel.innerHTML =
+      (myTypes.length > 1 ? `<option value="__all__">Бүгд (${myTypes.length} төрөл)</option>` : '') +
+      myTypes.map(k => {
+        const t = CONFIG.reportTypes.find(x => x.key === k);
+        return `<option value="${k}">${UI.esc(t ? t.name : k)}</option>`;
+      }).join('');
+    if(myTypes.length === 1) typeSel.value = myTypes[0];
+
+    /* Анхдагч хугацаа: тухайн сарын 1 → өнөөдөр */
+    const today = UI.today();
+    UI.$('#exFrom').value = today.slice(0, 8) + '01';
+    UI.$('#exTo').value = today;
+
+    UI.$('#exBtn').onclick = async () => {
+      const from = UI.$('#exFrom').value, to = UI.$('#exTo').value;
+      const msg = UI.$('#exportMsg');
+      UI.alertBox(msg, '');
+      if(!from || !to || from > to){ UI.alertBox(msg, 'Хугацаагаа зөв сонгоно уу.'); return; }
+      const btn = UI.$('#exBtn');
+      btn.disabled = true; btn.textContent = 'Бэлдэж байна…';
+      try{
+        const res = await API.range(from, to);
+        const reports = res.reports || [];
+        const keys = typeSel.value === '__all__' ? myTypes : [typeSel.value];
+        let body = '';
+        for(const k of keys) body += csvForType(k, reports);
+        if(!body){
+          UI.alertBox(msg, 'Энэ хугацаанд тайлан олдсонгүй.');
+        } else {
+          const head = 'sep=,\n' + csvRow(['Говь Ресурс Девелопмент — тайлангийн экспорт']) + '\n'
+            + csvRow(['Хугацаа', from + ' — ' + to]) + '\n\n';
+          const blob = new Blob(['﻿' + head + body], {type: 'text/csv;charset=utf-8'});
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = 'GRD_' + (typeSel.value === '__all__' ? 'buh_tailan' : typeSel.value)
+            + '_' + from + '_' + to + '.csv';
+          a.click();
+          setTimeout(() => URL.revokeObjectURL(a.href), 5000);
+          UI.alertBox(msg, 'Татагдлаа — Excel-ээр нээнэ үү.', true);
+        }
+      }catch(err){ UI.alertBox(msg, err.message); }
+      btn.disabled = false; btn.textContent = '⬇ Татах';
+    };
+  }
+  initExportPanel();
+
   function selectReport(key){
     UI.$$('.permission-card').forEach(b => b.classList.toggle('active', b.dataset.key === key));
     const type = CONFIG.reportTypes.find(t => t.key === key);
